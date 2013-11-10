@@ -56,6 +56,11 @@
   (zipmap (range 0 (* 4 (count seq)) 4)
           seq))
 
+(defn seq->state [instructions]
+  {:memory (seq->instrs instructions)
+   :registers {31 0}})
+
+
 (t/defn> bprn 
   :- (t/Seq i/InstructionVec)
   [str :- String]

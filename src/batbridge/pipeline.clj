@@ -196,10 +196,6 @@
         (recur ns (dec i)))
       state)))
 
-(defn icodes->state [instructions]
-  {:memory (i/seq->instrs instructions)
-   :registers {31 0}})
-
 (t/ann ^:no-check -main [(t/Map t/AnyInteger i/InstructionVec) -> i/Processor])
 (defn -main
   "Creates a processor state with a map \"instructions\" from
