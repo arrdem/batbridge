@@ -60,7 +60,6 @@
   {:memory (seq->instrs instructions)
    :registers {31 0}})
 
-
 (t/defn> bprn 
   :- (t/Seq i/InstructionVec)
   [str :- String]
