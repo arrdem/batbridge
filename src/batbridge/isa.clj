@@ -25,9 +25,13 @@
         :complete? true))
 
 (t/def-alias CommitCommand
-  (U '[(Value :memory)   t/AnyInteger t/AnyInteger]
+  (U '[(Value :load)      t/AnyInteger t/AnyInteger]
+     '[(Value :store)     t/AnyInteger t/AnyInteger]
      '[(Value :registers) t/AnyInteger t/AnyInteger]
-     (Value :halt)))
+     '[(Value :halt)]))
+
+(t/def-alias Instruction
+  (U InstructionMap InstructionVec CommitCommand t/AnyInteger))
 
 (t/def-alias Processor "A processor state"
   (HMap :mandatory {:registers Memory
@@ -46,29 +50,31 @@
 
 (t/defn> fetched?
   :- boolean
-  [o :- (U InstructionVec InstructionMap)]
+  [o :- Instruction]
   (:fetched?
    (meta o)))
 
 (t/defn> seq->instrs 
-  :- (t/Map t/AnyInteger i/InstructionVec)
-  [seq :- (t/Seq i/InstructionVec)]
+  :- (t/Map t/AnyInteger InstructionVec)
+  [seq :- (t/Seq InstructionVec)]
   (zipmap (range 0 (* 4 (count seq)) 4)
           seq))
 
-(defn seq->state [instructions]
+(t/defn> ^:no-check seq->state 
+  :- Processor
+  [instructions :- (t/Seq InstructionVec)]
   {:memory (seq->instrs instructions)
    :registers {31 0}})
 
 (t/defn> bprn 
-  :- (t/Seq i/InstructionVec)
+  :- (t/Seq InstructionVec)
   [str :- String]
   (map (t/fn> [x :- Character] [:add :r_ZERO :r_IMM 0 (int x)])
        str))
 
 (t/defn> halted? 
   :- boolean
-  [state :- i/Processor]
+  [state :- Processor]
   (or (:halted state) false))
 
 ; Registers
@@ -98,18 +104,24 @@
 (t/ann map-no-op InstructionMap)
 (def map-no-op
   (with-meta
-    {:icode :add
-     :dst   :r_ZERO
-     :srca  :r_ZERO
-     :srcb  :r_ZERO
-     :lit   0}
-    {:fetched? false}))
+    (t/ann-form
+     {:icode :add
+      :dst   :r_ZERO
+      :srca  :r_ZERO
+      :srcb  :r_ZERO
+      :lit   0}
+     InstructionMap)
+    {:fetched? false
+     :fetch-pc -1}))
 
 (t/ann vec-no-op InstructionVec)
 (def vec-no-op
   (with-meta 
-    [:add :r_ZERO :r_ZERO :r_ZERO 0]
-    {:fetched? false}))
+    (t/ann-form
+     [:add :r_ZERO :r_ZERO :r_ZERO 0]
+     InstructionVec)
+    {:fetched? false
+     :fetch-pc -1}))
 
 ; Opcode decoding & encoding helpers
 ;-------------------------------------------------------------------------------
