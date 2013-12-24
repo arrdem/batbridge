@@ -4,43 +4,56 @@
   operation performance and to allow correctness comparison between multiple
   differing processor implementations.")
 
-(def register-symbol-map
-  (-> (zipmap (range 30) (range 30))
-      (assoc :r_PC 31)
-      (assoc :r_IMM 30)
-      (assoc :r_ZERO 0)))
+;; Instructions are represented as being length five vectors of the
+;; structure [icode dst param param lit]. Instructions are stored in
+;; state memory as one would expect.
 
-(defn get-memory [p addr]
+(defn seq->instrs [seq]
+  (zipmap (range 0 (* 4 (count seq)) 4)
+          seq))
+
+(defn instrs->state [instrs]
+  {:memory instrs
+   :registers {31 0}})
+
+;; The state structure will be represented as a map:
+;; {:memory {<int> <val>}
+;;  :registers {<int> <val>}
+;;  :halted <boolean>
+;; }
+
+;; In addition, the :fetch, :decode, :execute and :writeback keys will
+;; be used to store intermediate values used in computing the next
+;; state of the processor.
+
+(defn get-memory 
+  "Accesses an address in a processor state's memory, returning the
+  value there."
+  [p addr]
   (get-in p [:memory addr] 0))
 
-(defn write-memory [p addr v]
+(defn write-memory 
+  "Writes the argument value into the processor state's memory,
+  returning an updated processor state representation."
+  [p addr v]
   (assoc-in p [:memory addr] v))
 
-(defn get-register [p reg]
+(defn get-register
+  "Fetches a register value by register ID from a processor state,
+  returning the value."
+  [p reg]
   (get-in p [:registers reg] 0))
 
-(defn fetch [processor]
-  (let [pc (get-register processor 31)
-        icode (get-memory processor pc)]
-    (assert (vector? icode))
-    (println "[fetch]" pc icode)
-    (-> processor
-        (update-in [:registers 31] (fn [x] (+ x 4)))
-        (assoc :fetch icode))))
+(defn halted? 
+  "Predicate to test whether a processor state record is halted."
+  [state]
+  (or (:halted state) false))
 
-(defn decode
-  "Dummy decode which translates a vector literal to an icode map. Not really
-  important now, but it'll be nice later."
-  [processor]
-  (let [icode (:fetch processor)]
-    (assoc processor :decode
-           {:icode (nth icode 0 :add)
-            :dst   (get register-symbol-map (nth icode 1 0) 0)
-            :srca  (get register-symbol-map (nth icode 2 0) 0)
-            :srcb  (get register-symbol-map (nth icode 3 0) 0)
-            :lit   (nth icode 4 0)})))
-
-(defn register->val [reg processor]
+(defn register->val 
+  "Helper function to compute a value from either a keyword register
+  alias or an integer register identifier. Returnes the value of
+  accessing the identified register."
+  [reg processor]
   (case reg
     (:r_ZERO 0) 0
     (:r_IMM 30) (get (get processor :decode {}) :lit 0)
@@ -49,7 +62,15 @@
         :registers
         (get reg 0))))
 
+(def register-symbol-map
+  "Maps register abbreviations and IDs to register IDs."
+  (-> (zipmap (range 30) (range 30))
+      (assoc :r_PC 31)
+      (assoc :r_IMM 30)
+      (assoc :r_ZERO 0)))
+
 (def opcode->fn
+  "Maps opcode names to implementing functions."
   {:add  (fn [x y _ dst] [:registers dst (+ x y)])
    :sub  (fn [x y _ dst] [:registers dst (- x y)])
    :mul  (fn [x y _ dst] [:registers dst (* x y)])
@@ -62,7 +83,42 @@
    :halt (fn [_ _ _ _]   :halt)
    })
 
-(defn execute [processor]
+
+
+(defn fetch 
+  "Accesses the value of the PC register, fetches the instruction
+  there from memory and sets the :fetch value key in the
+  state. Increments the PC by the instruction width. Returns an
+  updated state."
+  [processor]
+  (let [pc (get-register processor 31)
+        icode (get-memory processor pc)]
+    (assert (vector? icode))
+    (println "[fetch]" pc icode)
+    (-> processor
+        (update-in [:registers 31] (fn [x] (+ x 4)))
+        (assoc :fetch icode))))
+
+(defn decode
+  "Dummy decode which translates a vector literal to an icode map. Not
+  really important now because there is no binary decoding to do, but
+  it'll be nice later."  
+  [processor]
+  (let [icode (:fetch processor)]
+    (assoc processor :decode
+           {:icode (nth icode 0 :add)
+            :dst   (get register-symbol-map (nth icode 1 0) 0)
+            :srca  (get register-symbol-map (nth icode 2 0) 0)
+            :srcb  (get register-symbol-map (nth icode 3 0) 0)
+            :lit   (nth icode 4 0)})))
+
+(defn execute 
+  "Indexes into the opcode->fn map to fetch the implementation of the
+  last decoded instruction. Decodes the parameter values, and applies
+  the implementation function to the parameters. Sets the :execute key
+  with a state update directive which can use. Returns the updated
+  processor state."
+  [processor]
   (let [icode (:decode processor)
         srca  (register->val (get icode :srca 0) processor)
         srcb  (register->val (get icode :srcb 0) processor)
@@ -73,7 +129,12 @@
           (v srca srcb processor dst)
           (assoc processor :execute v))))
 
-(defn writeback [processor]
+(defn writeback 
+  "Pulls a writeback directive out of the processor state, and
+  performs the indicated update on the processor state. Updates are
+  either the value :halt, or vectors [:memory <addr> <val>] or
+  [:registers <addr> <val>]. Returns an updated state."
+  [processor]
   (let [directive (:execute processor)]
     (cond ;; special case to stop the show
           (= :halt directive)
@@ -90,9 +151,6 @@
                                (nth directive 1 0)]
                  (nth directive 2 0)))))
 
-(defn halted? [state]
-  (or (:halted state) false))
-
 (defn step
   "Sequentially applies each phase of execution to a single processor
   state, returning an updated state representing a single cycle of
@@ -103,18 +161,6 @@
       (decode)
       (execute)
       (writeback)))
-
-(defn seq->instrs [seq]
-  (zipmap (range 0 (* 4 (count seq)) 4)
-          seq))
-
-(defn instrs->state [instrs]
-  {:memory instrs
-   :registers {31 0}})
-
-(defn bprn [str]
-  (map (fn [x] [:add :r_ZERO :r_IMM 0 (int x)])
-       str))
 
 (defn -main
   "Steps a processor state until such time as it becomes marked as
