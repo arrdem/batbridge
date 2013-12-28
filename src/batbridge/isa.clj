@@ -36,7 +36,7 @@
 (t/def-alias Processor "A processor state"
   (HMap :mandatory {:registers Memory
                     :memory    Memory
-                    :fetch   InstructionVec
+                    :fetch   t/AnyInteger
                     :decode  InstructionMap
                     :execute CommitCommand
                     :halted  boolean}
@@ -54,7 +54,7 @@
   (:fetched?
    (meta o)))
 
-(t/defn> seq->instrs 
+(t/defn> seq->instrs
   :- (t/Map t/AnyInteger InstructionVec)
   [seq :- (t/Seq InstructionVec)]
   (zipmap (range 0 (* 4 (count seq)) 4)
@@ -122,55 +122,3 @@
      InstructionVec)
     {:fetched? false
      :fetch-pc -1}))
-
-; Opcode decoding & encoding helpers
-;-------------------------------------------------------------------------------
-(t/ann word->opcode [t/AnyInteger -> t/AnyInteger])
-(defn word->opcode
-  "Pulls the opcode bits out of a word"
-  [word]
-  (-> word
-      (bit-shift-right 26)
-      (bit-and 0x3f)))
-
-(t/ann word->dst [t/AnyInteger -> t/AnyInteger])
-(defn word->dst 
-  "Pulls the destination bits out of a word"
-  [word]
-  (-> word
-      (bit-shift-right 21)
-      (bit-and 0x1f)))
-
-(t/ann word->srca [t/AnyInteger -> t/AnyInteger])
-(defn word->srca 
-  "Pulls the source A bits out of a word"
-  [word]
-  (-> word
-      (bit-shift-right 16)
-      (bit-and 0x1f)))
-
-(t/ann word->srcb [t/AnyInteger -> t/AnyInteger])
-(defn word->srcb 
-  "Pulls the source B bits out of a word"
-  [word]
-  (-> word
-      (bit-shift-right 11)
-      (bit-and 0x1f)))
-
-(t/ann word->lit [t/AnyInteger -> t/AnyInteger])
-(defn word->lit 
-  "Pulls the literal bits out of a word"
-  [word]
-  (bit-and word 0x7ff))
-
-(t/ann word->symbol-map [t/AnyInteger -> InstructionMap])
-(defn word->symbol-map
-  "Pulls appart a word, building the symbolic assembler map which the
-  Clojure simulators are designed to work with and which a human can
-  reasonably debug."
-  [word]
-  {:icode (word->opcode word)
-   :dst   (word->dst word)
-   :srca  (word->srca word)
-   :srcb  (word->srcb word)
-   :lit   (word->lit word)})
