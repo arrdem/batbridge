@@ -1,55 +1,15 @@
-(ns batbridge.isa)
+(ns batbridge.isa
+  "Define two structures for identifying and executing Batbridge
+  opcodes which will be common to the various simulators. These
+  structures were refactored out of several different simulators in
+  the interests of making spec compliance easiser to maintain."
+
+  (:require [batbridge [bytecode :refer [word->symbol-map]]
+                       [common   :refer [get-register get-memory]]]))
 
 
-(defn register? 
-  "Predicate to test whether or not the argument integer is a valid
-  register identifier."
-
-  [x]
-  (and (number? x)
-       (< x 32)
-       (>= x 0)))
-
-
-(defn seq->instrs
-  "Translates a sequence of _vector_ instructions to a map of word IDs
-   to instructions. Note that this _cannot_ be used for a bytecode
-   interpreter because it approximates a byte buffer by aligning
-   instructions at multiples of 4 and contains vector instructions
-   rather than bytecodes."
-
-  [seq] 
-  (zipmap (range 0 (* 4 (count seq)) 4) seq))
-
-
-(defn instrs->state 
-  "Generates the minimum of a processor state required to invoke
-  a (step) implementation successfully. Agnostic as to the details of
-  the instructions value."  
-  
-  [instructions]
-  {:memory (seq->instrs instructions)
-   :registers {31 0}})
-
-
-(defn halted? 
-  "Common predicate for testing whether a processor state has become
-  halted or not yet."
-
-  [state]
-  (or (:halted state) false))
-
-
-(def register-symbol-map
-  "Provides translation from the shorthand keyword symbols used to
-  identify registers to their integer index IDs."
-
-  (-> (zipmap (range 32) (range 32))
-      (assoc :r_IMM  29)
-      (assoc :r_ZERO 30)
-      (assoc :r_PC   31)))
-
-
+;; No-op constants for the various stages
+;;------------------------------------------------------------------------------
 (def map-no-op
   "Map constant representing a no-op. Used in lieu of a fetched
   instruction by decode."
@@ -58,7 +18,8 @@
    :dst   :r_ZERO
    :srca  :r_ZERO
    :srcb  :r_ZERO
-   :lit   0})
+   :lit   0
+   :pc    0})
 
 
 (def vec-no-op
@@ -70,57 +31,16 @@
 
 (def bytecode-no-op
   "Long constant representing the bytecode encoding of 
-  [:add 0 30 0 0]. May be used by fetch stages in lieu of a true 
+  [:add 30 30 30 0]. May be used by fetch stages in lieu of a true 
   fetched value."
 
-  0xC000F000)
+  0xC3DEF000)
 
 
-;; Various processor components refactored out due to commonality
-;;------------------------------------------------------------------------------
-(defn get-memory
-  "Accesses an address in a processor state's memory, returning the
-  value there. Defaults to 0, so the processor will halt if it jumps
-  into unset instructions."
+(def writeback-no-op
+  "Writeback instruction which will do exactly nothing!"
 
-  [p addr]
-  (get-in p [:memory addr] 0))
-
-
-(defn write-memory
-  "Writes the argument value into the processor state's memory,
-  returning an updated processor state representation."
-
-  [p addr v]
-  (assoc-in p [:memory addr] v))
-
-
-(defn get-register
-  "Fetches a register value by register ID from a processor state,
-  returning the value."
-
-  [p reg]
-  (get-in p [:registers reg] 0))
-
-
-(defn register->val
-  "Helper function to compute a value from either a keyword register
-  alias or an integer register identifier. Returnes the value of
-  accessing the identified register."
-  [reg processor pc]
-  (case reg
-    (:r_PC   31) pc
-    (:r_ZERO 30) 0
-    (:r_IMM  29) (get-in processor [:decode :lit] 0)
-    (-> processor :registers (get reg 0))))
-
-
-(defn upgrade-writeback-command
-  "Transforms an old vector writeback command into the new map
-  structure, thus allowing for pc data to be preserved."
-  
-  [[dst addr v]]
-  {:dst dst :addr addr :val v})
+  {:dst :registers :addr 30 :val 0})
 
 
 ;; The  common opcode implementation map
@@ -185,3 +105,61 @@
    0x3B :sr
    0x3C :sal
    0x3D :sar})
+
+
+(def register-symbol-map
+  "Provides translation from the shorthand keyword symbols used to
+  identify registers to their integer index IDs."
+
+  (-> (zipmap (range 32) (range 32))
+      (assoc :r_IMM  29)
+      (assoc :r_ZERO 30)
+      (assoc :r_PC   31)))
+
+
+;; The decode operation which is entirely common to all the processors
+;;------------------------------------------------------------------------------
+(defn vec->symbol-map
+  "Pulls appart a vector instruction, building the symbolic assembler
+  map which the Clojure simulators are designed to work with."
+  [vec]
+  (let [[op dst srca srcb lit] vec]
+    (doseq [i [op dst srca srcb lit]]
+      (assert (not (nil? i))))
+    {:icode op
+     :dst   dst
+     :srca  srca
+     :srcb  srcb
+     :imm   lit}))
+
+
+(defn normalize-icode
+  "Does integer to symbol remapping for the icode of a decoded instr."
+  [{:keys [icode] :as decode}]
+  (assoc decode :icode (get bytecode->opcode icode icode)))
+
+
+(defn normalize-registers
+  "Does symbol to integer normalization for the register parameters of
+  a decoded instruction."
+  [{:keys [srca srcb dst] :as decode}]
+  (-> decode
+      (assoc :srca (get register-symbol-map srca srca))
+      (assoc :srcb (get register-symbol-map srcb srcb))
+      (assoc :dst  (get register-symbol-map dst dst))))
+
+
+(defn decode-instr
+  "A somewhat more heavy duty decode. Determines whether the icode to
+  be decoded is a vector or an integer, and performs the appropriate
+  decoding to a map. Note that this version of decode does _not_
+  perform value loading. As value loading becomes complicated in an
+  out of order processor that task is left to the processor
+  simulators."
+
+  [icode]
+  (cond-> icode
+          (vector? icode)   vec->symbol-map
+          (integer?  icode) word->symbol-map
+          true              normalize-icode
+          true              normalize-registers))
