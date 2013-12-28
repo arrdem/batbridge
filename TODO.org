@@ -1,0 +1,33 @@
+* FIXME list
+** TODO Rebuild the pipelined processor
+   There's a big comment describing tracking instruction PCs as
+   metadata. Get 'er done.
+
+** TODO Begin to sketch out register renaming
+
+** TODO Write some test programs for the symbolic single cycle processor
+
+** TODO Manually assemble the test programs
+   Create a test which the two single cycle implementations by
+   comparison against each-other over the test programs.
+
+** TODO Test the pipeline agains the single cycles
+   Create test cases comparing the results of the pipelined machine to
+   the single cycle machine for a given input program.
+
+** TODO Merge the bytecode and symbolic interpreters
+   Figure out a way to merge the bytecode and symbolic single cycle
+   processors since they share about 95% of their code and it really
+   kinda sucks that I have two clearly identical interpreters which I
+   need to validate against each-other because they differ in input
+   format.
+
+** TODO Create decoding test cases
+   Hack together some test cases to make sure that the bytecode
+   decoder performs as required
+
+** TODO Create a static map from bytecodes to symbols
+   In the interests of increasing code commonality, create a map
+   which translates an integer instruction code to it's symbol (or
+   vice-versa) so that for each class of processor only one mapping
+   from symbols to opcode implementations is required.
