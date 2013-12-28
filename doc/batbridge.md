@@ -1,27 +1,42 @@
 # The Batbridge ISA specification
 
-The PC 31 (0b11111)
-  - reading it produces the PC of the next instruction
-  - having it as a target causes a branch
+The Batbridge machine standard was designed to be a simple RISC-like
+instruction set used in
+[Ahmed Gheith's CS375H](http://www.cs.utexas.edu/~gheith/). The
+Batbridge architecture is a 32 bit instruction encoding, the first six
+bits of which represent an opcode, the next three five bit hunks are
+opcode register parameters and the last eleven bits of which is an
+inline literal. The Batbridge machine features 32 registers, numbered
+[0,31], of which the following are special.
 
-The Zero register 30 (0b11110)
-  - always read as 0
-  - writing to it prints its value on the console (ASCII)
+The PC, register #31 (0b11111)
+  - Reading it produces the PC of the next instruction
+  - Writing to the PC causes a branch, along with any other required
+    system wide side effects for proper branching.
 
-The Immediate value 29 (0b1101)
-  - when read produces the 11 bit immediate field in the instruction
-  - writing to it prints its value on the console (HEX)
+The zero register, register #30 (0b11110)
+  - Always reads as having the value 0
+  - Writing to the zero register does not change its value
+  - Writing to the zero register on simulators writes the written
+    value as a character to standard output as a debugging device.
+
+The immediate value, register #29 (0b1101)
+  - When read, yields the 11 bit immediate field in the current instruction
+  - Writing the immediate does not change the immediate or any other system state.
+  - On simulators, writing to the immediate value prints the written
+    value on the console as a hex string.
 
 ## Encoding specification
 
-character : value type
- t : target register
- s : source register
- a : register representing left operand
- b : register representing right operand
- x : register representing index (multiplied by operand size)
- i : immediate signed quantity
- _ : value is not read. Set to 0 when assembled
+ t : Target register. The sequence "ttttt" means the bit ID of the
+     target register, the metavariable t in the opcode description is
+     taken to mean the target register itself
+ s : Source register
+ a : Register representing left operand
+ b : Register representing right operand
+ x : Register representing index (multiplied by operand size)
+ i : Immediate signed quantity
+ _ : Value is not read. Set to 0 when assembled by convention.
 
 ```
 HLT  0x00 000000 _____ _____ _____ ___________
@@ -74,10 +89,13 @@ XOR  0x38 111000 ttttt aaaaa bbbbb iiiiiiiiiii
  
 SL   0x3a 111010 ttttt aaaaa bbbbb iiiiiiiiiii
      stores the left shift of a by b bits to t
- 
-SAR  0x3b 111011 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the arithmatic right shift of a by b bits to t
+
+SR   0x3b 111011 ttttt aaaaa bbbbb iiiiiiiiiii
+     stores the right shift of a by b bits to t
  
 SLR  0x3c 111100 ttttt aaaaa bbbbb iiiiiiiiiii
      stores the shift of a b bits to t
+
+SAR  0x3d 111101 ttttt aaaaa bbbbb iiiiiiiiiii
+     stores the arithmatic right shift of a by b bits to t
 ```
