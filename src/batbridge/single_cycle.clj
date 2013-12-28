@@ -3,44 +3,8 @@
   out-of-order or superscalar excutuion. Will serve as a benchmark for per-cycle
   operation performance and to allow correctness comparison between multiple
   differing processor implementations."
-  (:require [batbridge [isa :refer :all]]))
-
-
-(def opcode->fn
-  "Maps opcode names to implementing functions."
-  {
-   :halt (fn [_ _ _ _  ] :halt)
-   :ld   (fn [x y p dst] [:registers dst (get-memory p (+ x (* 4 y)))])
-   :st   (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
-
-   :iflt (fn [x y p dst]
-           (let [pc (get-register 31)]
-             [:registers 31 (if (< x y) pc (+ pc 4))]))
-
-   :ifle (fn [x y p dst]
-           (let [pc (get-register 31)]
-             [:registers 31 (if (<= x y) pc (+ pc 4))]))
-
-   :ifeq (fn [x y p dst]
-           (let [pc (get-register 31)]
-             [:registers 31 (if (= x y) pc (+ pc 4))]))
-
-   :ifne (fn [x y p dst]
-           (let [pc (get-register 31)]
-             [:registers 31 (if (!= x y) pc (+ pc 4))]))
-
-   :add  (fn [x y _ dst] [:registers dst (+ x y)])
-   :sub  (fn [x y _ dst] [:registers dst (- x y)])
-   :div  (fn [x y _ dst] [:registers dst (/ x y)])
-   :mod  (fn [x y _ dst] [:registers dst (mod x y)])
-   :mul  (fn [x y _ dst] [:registers dst (* x y)])
-   :and  (fn [x y _ dst] [:registers dst (bit-and x y)])
-   :or   (fn [x y _ dst] [:registers dst (bit-or x y)])
-   :nand (fn [x y _ dst] [:registers dst (bit-not (bit-and x y))])
-   :xor  (fn [x y _ dst] [:registers dst (bit-xor x y)])
-   :sl   (fn [x y _ dst] [:registers dst (bit-shift-left x y)])
-   :sr   (fn [x y _ dst] [:registers dst (bit-shift-right x y)])
-   })
+  (:require [batbridge [common :as common]
+                       [isa :as isa]]))
 
 
 (defn fetch 
@@ -50,13 +14,12 @@
   updated state."
 
   [processor]
-  (let [pc (get-register processor 31)
-        icode (get-memory processor pc)]
-    (assert (vector? icode))
-    (println "[fetch]" pc icode)
+  (let [pc (common/get-register processor 31)
+        icode (common/get-memory processor pc)]
+    (println "[fetch    ]" pc "->" icode)
     (-> processor
         (update-in [:registers 31] (fn [x] (+ x 4)))
-        (assoc :fetch icode))))
+        (assoc :fetch {:icode icode :pc pc}))))
 
 
 (defn decode
@@ -65,13 +28,14 @@
   it'll be nice later."  
 
   [processor]
-  (let [icode (:fetch processor)]
-    (assoc processor :decode
-           {:icode (nth icode 0 :add)
-            :dst   (get register-symbol-map (nth icode 1 0) 0)
-            :srca  (get register-symbol-map (nth icode 2 0) 0)
-            :srcb  (get register-symbol-map (nth icode 3 0) 0)
-            :lit   (nth icode 4 0)})))
+  (let [{:keys [icode pc] :as fetch} 
+            (get processor :fetch {:icode isa/vec-no-op
+                                   :pc    -1})]
+    (println "[decode   ]" icode)
+    (as-> icode v 
+          (isa/decode-instr v)
+          (assoc v :pc pc)
+          (assoc processor :decode v))))
 
 
 (defn execute 
@@ -82,45 +46,62 @@
   processor state."
 
   [processor]
-  (let [icode (:decode processor)
-        srca  (register->val (get icode :srca 0) processor)
-        srcb  (register->val (get icode :srcb 0) processor)
-        dst   (get register-symbol-map (get icode :dst 0) 0)
-        icode (get icode :icode :add)]
+  (let [{:keys [icode srca srcb dst imm pc]}
+        (get processor :decode
+             {:icode :add   :dst 0
+              :srca  0      :srcb 30
+              :imm   0      :pc -1})
+        srca  (common/register->val processor srca pc imm)
+        srcb  (common/register->val processor srcb pc imm)]
+    (println "[execute  ]" (:decode processor))
     (as-> icode v
-          (get opcode->fn v (constantly :halt))
+          (get isa/opcode->fn v)
           (v srca srcb processor dst)
+          (common/upgrade-writeback-command v)
+          (assoc v :pc (get-in processor [:decode :pc]))
           (assoc processor :execute v))))
 
 
 (defn writeback 
   "Pulls a writeback directive out of the processor state, and
-  performs the indicated update on the processor state. Updates are
-  either the value :halt, or vectors [:memory <addr> <val>] or
-  [:registers <addr> <val>]. Returns an updated state."
+  performs the indicated update on the processor state. Update command
+  have been restructured and are now maps
+  {:dst (U :registers :halt :memory) :addr Int :val Int}."  
 
   [processor]
-  (let [directive (:execute processor)]
+  (let [directive (get processor :execute isa/writeback-no-op)
+        {:keys [dst addr val]} directive]
+    (println "[writeback]" directive)
     (cond ;; special case to stop the show
-          (= :halt directive)
+          (= :halt dst)
             (assoc processor :halted true)
           
-          ;; special case for printing - char
-          (and (= :registers (first directive))
-               (= 30 (second directive)))
-            (do (print (char (nth directive 2 0)))
+          ;; special case for hex code printing
+          (and (= :registers dst)
+               (= 29 addr))
+            (do (when-not (zero? val)
+                  (print (format "0x%X" (char val))))
                 processor)
 
-          ;; special case for printing - hex
-          (and (= :registers (first directive))
-               (= 29 (second directive)))
-            (do (print (format "0x%X" (nth directive 2 0)))
+          ;; special case for printing
+          (and (= :registers dst)
+               (= 30 addr))
+            (do (when-not (zero? val)
+                  (print (char val)))
                 processor)
+            
+          ;; special case for branching as we must flush the pipeline
+          (and (= :registers dst)
+               (= 31 addr))
+            (do (println "[writeback] flushing pipeline!")
+                (-> processor
+                    (dissoc :fetch)
+                    (dissoc :decode)
+                    (dissoc :execute)
+                    (assoc-in [:registers addr] val)))
 
           true
-          (assoc-in processor [(nth directive 0 :registers)
-                               (nth directive 1 0)]
-                 (nth directive 2 0)))))
+            (assoc-in processor [dst addr] val))))
 
 
 (defn step
@@ -130,10 +111,10 @@
 
   [state]
   (-> state
-      (fetch)
-      (decode)
-      (execute)
-      (writeback)))
+      fetch
+      decode
+      execute
+      writeback))
 
 
 (defn -main
@@ -143,6 +124,6 @@
 
   [state]
   (loop [state state]
-    (if-not (halted? state)
+    (if-not (common/halted? state)
       (recur (step state))
       state)))
