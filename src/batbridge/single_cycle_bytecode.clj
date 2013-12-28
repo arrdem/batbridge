@@ -30,11 +30,32 @@
    0x0   (fn [_ _ _ _  ] :halt)
    0x10  (fn [x y p dst] [:registers dst (get-memory p (+ x (* 4 y)))])
    0x11  (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
+
+   0x20  (fn [x y p dst]
+           (let [pc (get-register 31)]
+             [:registers 31 (if (< x y) pc (+ pc 4))]))
+
+   0x21  (fn [x y p dst]
+           (let [pc (get-register 31)]
+             [:registers 31 (if (<= x y) pc (+ pc 4))]))
+
+   0x22 (fn [x y p dst]
+           (let [pc (get-register 31)]
+             [:registers 31 (if (= x y) pc (+ pc 4))]))
+
+   0x23 (fn [x y p dst]
+           (let [pc (get-register 31)]
+             [:registers 31 (if (!= x y) pc (+ pc 4))]))
+
    0x30  (fn [x y _ dst] [:registers dst (+ x y)])
    0x31  (fn [x y _ dst] [:registers dst (- x y)])
    0x32  (fn [x y _ dst] [:registers dst (/ x y)])
    0x33  (fn [x y _ dst] [:registers dst (mod x y)])
    0x34  (fn [x y _ dst] [:registers dst (* x y)])
+   0x35  (fn [x y _ dst] [:registers dst (bit-and x y)])
+   0x36  (fn [x y _ dst] [:registers dst (bit-or x y)])
+   0x37  (fn [x y _ dst] [:registers dst (bit-not (bit-and x y))])
+   0x37  (fn [x y _ dst] [:registers dst (bit-xor x y)])
    0x3A  (fn [x y _ dst] [:registers dst (bit-shift-left x y)])
    0x3B  (fn [x y _ dst] [:registers dst (bit-shift-right x y)])
    })

@@ -8,16 +8,38 @@
 
 (def opcode->fn
   "Maps opcode names to implementing functions."
-  {:add  (fn [x y _ dst] [:registers dst (+ x y)])
-   :sub  (fn [x y _ dst] [:registers dst (- x y)])
-   :mul  (fn [x y _ dst] [:registers dst (* x y)])
-   :div  (fn [x y _ dst] [:registers dst (/ x y)])
-   :mod  (fn [x y _ dst] [:registers dst (mod x y)])
-   :shr  (fn [x y _ dst] [:registers dst (bit-shift-right x y)])
-   :shl  (fn [x y _ dst] [:registers dst (bit-shift-left x y)])
+  {
+   :halt (fn [_ _ _ _  ] :halt)
    :ld   (fn [x y p dst] [:registers dst (get-memory p (+ x (* 4 y)))])
    :st   (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
-   :halt (fn [_ _ _ _]   :halt)
+
+   :iflt (fn [x y p dst]
+           (let [pc (get-register 31)]
+             [:registers 31 (if (< x y) pc (+ pc 4))]))
+
+   :ifle (fn [x y p dst]
+           (let [pc (get-register 31)]
+             [:registers 31 (if (<= x y) pc (+ pc 4))]))
+
+   :ifeq (fn [x y p dst]
+           (let [pc (get-register 31)]
+             [:registers 31 (if (= x y) pc (+ pc 4))]))
+
+   :ifne (fn [x y p dst]
+           (let [pc (get-register 31)]
+             [:registers 31 (if (!= x y) pc (+ pc 4))]))
+
+   :add  (fn [x y _ dst] [:registers dst (+ x y)])
+   :sub  (fn [x y _ dst] [:registers dst (- x y)])
+   :div  (fn [x y _ dst] [:registers dst (/ x y)])
+   :mod  (fn [x y _ dst] [:registers dst (mod x y)])
+   :mul  (fn [x y _ dst] [:registers dst (* x y)])
+   :and  (fn [x y _ dst] [:registers dst (bit-and x y)])
+   :or   (fn [x y _ dst] [:registers dst (bit-or x y)])
+   :nand (fn [x y _ dst] [:registers dst (bit-not (bit-and x y))])
+   :xor  (fn [x y _ dst] [:registers dst (bit-xor x y)])
+   :sl   (fn [x y _ dst] [:registers dst (bit-shift-left x y)])
+   :sr   (fn [x y _ dst] [:registers dst (bit-shift-right x y)])
    })
 
 
