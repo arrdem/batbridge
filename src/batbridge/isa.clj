@@ -1,124 +1,69 @@
 (ns batbridge.isa
   (:require [clojure.core.typed :as t]))
 
-(t/def-alias Memory "A storage medium within a processor"
-  (t/Map t/AnyInteger t/AnyInteger))
+(defn register? 
+  "Predicate to test whether or not the argument integer is a valid
+  register identifier."
 
-(t/def-alias Storage
-  (U (Value :registers) (Value :memory)))
-
-(t/def-alias InstructionParam "An instruction parameter"
-  (U t/AnyInteger
-     (Value :r_PC)
-     (Value :r_IMM)
-     (Value :r_ZERO)))
-
-(t/def-alias InstructionVec "A symbolic vector instruction"
-  '[t/Keyword InstructionParam InstructionParam InstructionParam t/AnyInteger])
-
-(t/def-alias InstructionMap "A parsed map instruction"
-  (HMap :mandatory {:icode (U t/Keyword t/AnyInteger)
-                    :dst   InstructionParam
-                    :srca  InstructionParam
-                    :srcb  InstructionParam
-                    :lit   t/AnyInteger}
-        :complete? true))
-
-(t/def-alias CommitCommand
-  (U '[(Value :load)      t/AnyInteger t/AnyInteger]
-     '[(Value :store)     t/AnyInteger t/AnyInteger]
-     '[(Value :registers) t/AnyInteger t/AnyInteger]
-     '[(Value :halt)]))
-
-(t/def-alias Instruction
-  (U InstructionMap InstructionVec CommitCommand t/AnyInteger))
-
-(t/def-alias Processor "A processor state"
-  (HMap :mandatory {:registers Memory
-                    :memory    Memory
-                    :fetch   t/AnyInteger
-                    :decode  InstructionMap
-                    :execute CommitCommand
-                    :halted  boolean}
-        :complete? true))
-
-(t/ann register? [t/AnyInteger -> boolean])
-(defn register? [x]
+  [x]
   (and (number? x)
        (< x 32)
        (>= x 0)))
 
-(t/defn> fetched?
-  :- boolean
-  [o :- Instruction]
-  (:fetched?
-   (meta o)))
+(defn seq->instrs
+  "Translates a sequence of _vector_ instructions to a map of word IDs
+   to instructions. Note that this _cannot_ be used for a bytecode
+   interpreter because it approximates a byte buffer by aligning
+   instructions at multiples of 4 and contains vector instructions
+   rather than bytecodes."
 
-(t/defn> seq->instrs
-  :- (t/Map t/AnyInteger InstructionVec)
-  [seq :- (t/Seq InstructionVec)]
-  (zipmap (range 0 (* 4 (count seq)) 4)
-          seq))
+  [seq] 
+  (zipmap (range 0 (* 4 (count seq)) 4) seq))
 
-(t/defn> ^:no-check seq->state 
-  :- Processor
-  [instructions :- (t/Seq InstructionVec)]
+(defn instrs->state 
+  "Generates the minimum of a processor state required to invoke
+  a (step) implementation successfully. Agnostic as to the details of
+  the instructions value."  
+  
+  [instructions]
   {:memory (seq->instrs instructions)
    :registers {31 0}})
 
-(t/defn> bprn 
-  :- (t/Seq InstructionVec)
-  [str :- String]
-  (map (t/fn> [x :- Character] [:add :r_ZERO :r_IMM 0 (int x)])
-       str))
+(defn halted? 
+  "Common predicate for testing whether a processor state has become
+  halted or not yet."
 
-(t/defn> halted? 
-  :- boolean
-  [state :- Processor]
+  [state]
   (or (:halted state) false))
 
-; Registers
-;-------------------------------------------------------------------------------
-;; The PC 31 (0b11111)
-;;   - reading it produces the PC of the next instruction
-;;   - having it as a target causes a branch
-
-;; The Zero register 30 (0b11110)
-;;   - always read as 0
-;;   - writing to it prints its value on the console (ASCII)
-
-;; The Immediate value 29 (0b1101)
-;;   - when read produces the 11 bit immediate field in the instruction
-;;   - writing to it prints its value on the console (HEX)
-
-;; Shortcut datastructure for mapping a register's numeric code to
-;; it's human readable "assembler" representation.
-(t/ann register-symbol-map (t/Map InstructionParam t/AnyInteger))
 (def register-symbol-map
-  (-> (t/ann-form (zipmap (range 30) (range 30))
-                  (t/Map t/AnyInteger t/AnyInteger))
-      (assoc :r_PC 31)
-      (assoc :r_IMM 30)
-      (assoc :r_ZERO 0)))
+  "Provides translation from the shorthand keyword symbols used to
+  identify registers to their integer index IDs."
 
-(t/ann map-no-op InstructionMap)
+  (-> (zipmap (range 32) (range 32))
+      (assoc :r_IMM  29)
+      (assoc :r_ZERO 30)
+      (assoc :r_PC   31)))
+
 (def map-no-op
-  (with-meta
-    (t/ann-form
-     {:icode :add
-      :dst   :r_ZERO
-      :srca  :r_ZERO
-      :srcb  :r_ZERO
-      :lit   0}
-     InstructionMap)
-    {:fetched? false
-     :fetch-pc -1}))
+  "Map constant representing a no-op. Used in lieu of a fetched
+  instruction by decode."
 
-(t/ann vec-no-op InstructionVec)
+  {:icode :add
+   :dst   :r_ZERO
+   :srca  :r_ZERO
+   :srcb  :r_ZERO
+   :lit   0})
+
 (def vec-no-op
-  (with-meta 
-    (t/ann-form
-     [:add :r_ZERO :r_ZERO :r_ZERO 0]
-     InstructionVec)
-    {:fetched? false
-     :fetch-pc -1}))
+  "Vector constant representing a no-op. May be used by fetch stages
+  in lieu of a meaningful fetched value." 
+
+  [:add :r_ZERO :r_ZERO :r_ZERO 0])
+
+(def bytecode-no-op
+  "Long constant representing the bytecode encoding of 
+  [:add 0 30 0 0]. May be used by fetch stages in lieu of a true 
+  fetched value."
+
+  0xC000F000)
