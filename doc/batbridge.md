@@ -26,8 +26,8 @@ The immediate value, register #29 (0b1101)
   - On simulators, writing to the immediate value prints the written
     value on the console as a hex string.
 
-## Encoding specification
-
+## Encoding specification notes
+```
  t : Target register. The sequence "ttttt" means the bit ID of the
      target register, the metavariable t in the opcode description is
      taken to mean the target register itself
@@ -38,6 +38,9 @@ The immediate value, register #29 (0b1101)
  i : Immediate signed quantity
  _ : Value is not read. Set to 0 when assembled by convention.
 
+```
+
+## Instruction set
 ```
 HLT  0x00 000000 _____ _____ _____ ___________
      halts the machine immediately
