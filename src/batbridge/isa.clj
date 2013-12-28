@@ -1,5 +1,4 @@
-(ns batbridge.isa
-  (:require [clojure.core.typed :as t]))
+(ns batbridge.isa)
 
 
 (defn register? 
@@ -131,8 +130,7 @@
   generic with respect to processor state, and can therefor be re-used
   by all processors."
 
-  {
-   :halt (fn [_ _ _ _  ] [:halt nil nil])
+  {:halt (fn [_ _ _ _  ] [:halt nil nil])
    :ld   (fn [x y p dst] [:registers dst (get-memory p (+ x (* 4 y)))])
    :st   (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
 
@@ -162,8 +160,7 @@
    :nand (fn [x y _ dst] [:registers dst (bit-not (bit-and x y))])
    :xor  (fn [x y _ dst] [:registers dst (bit-xor x y)])
    :sl   (fn [x y _ dst] [:registers dst (bit-shift-left x y)])
-   :sr   (fn [x y _ dst] [:registers dst (bit-shift-right x y)])
-   })
+   :sr   (fn [x y _ dst] [:registers dst (bit-shift-right x y)])})
 
 
 (def bytecode->opcode
