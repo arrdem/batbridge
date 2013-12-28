@@ -3,7 +3,8 @@
   effort to perform branch prediction, instruction caching or memory
   caching. Correctness with respect to the pipeline and bubbles is
   ensured however."
-  (:require [batbridge.isa :refer :all]))
+  (:require [batbridge.isa :refer :all
+                           :exclude [register->val]]))
 
 
 ;; Differences from the single cycle implementations.
@@ -15,7 +16,7 @@
 ;; order to accomidate this metadata, the following changes to the
 ;; single cycle processor data representation have been made.
 ;;
-;; :fetch is now a map {:pc Int, :icode Icode}
+;; :fetch is now a map {:pc Int, :icode Icode} [DONE]
 ;; :decode now has a :pc key
 ;; :execute is now a map {:cmd (U :registers :memory :halt),
 ;;                        :dst Int, :val Int}
@@ -30,7 +31,7 @@
 ;;    instructions and a number of the data instructions are missing.
 (def opcode->fn
   "Maps opcode names to implementing functions."
-  {:add  (fn [x y _ dst] {:cmd :registers :dst dst :val (+ x y)})
+  {:add  (fn [x y _ dst] [:registers dst (+ x y)])
    :sub  (fn [x y _ dst] [:registers dst (- x y)])
    :mul  (fn [x y _ dst] [:registers dst (* x y)])
    :div  (fn [x y _ dst] [:registers dst (/ x y)])
@@ -39,8 +40,40 @@
    :shl  (fn [x y _ dst] [:registers dst (bit-shift-left x y)])
    :ld   (fn [x y p dst] [:registers dst (get-memory p (+ x (* 4 y)))])
    :st   (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
-   :halt (fn [_ _ _ _]   :halt)
+   :halt (fn [_ _ _ _]   [:halt nil nil])
    })
+
+
+(defn get-instr
+  "Special case of memory access which yields an addition no-op if
+  there is no value at the target memory address."
+
+  [processor addr]
+  (get-in processor [:memory addr] [:add 0 0 30 0]))
+
+
+(defn upgrade-writeback-command
+  "Transforms an old vector writeback command into the new map
+  structure, thus allowing for pc data to be preserved."
+  
+  [[dst addr v]]
+  {:dst dst :addr addr :val v})
+
+
+(defn register->val
+  "Helper function to compute a value from either a keyword register
+  alias or an integer register identifier. Returnes the value of
+  accessing the identified register. Note that this differs from
+  batbridge.isa/register->val in that it provides for yielding the
+  address of the next instruction to be executed in a pipelined
+  execution environment."
+
+  [reg processor]
+  (case reg
+    (:r_PC   31) (+ (get-in processor [:decode :pc]) 4)
+    (:r_ZERO 30) 0
+    (:r_IMM  29) (get (get processor :decode {}) :lit 0)
+    (-> processor :registers (get reg 0))))
 
 
 (defn fetch 
@@ -65,14 +98,15 @@
   it'll be nice later."  
 
   [processor]
-  (let [icode (get processor :fetch [:add 0 0 0 0])]
+  (let [icode (get-in processor [:fetch :icode] [:add 0 0 30 0])]
     (println "[decode   ]" icode)
     (assoc processor :decode
            {:icode (nth icode 0 :add)
             :dst   (get register-symbol-map (nth icode 1 0) 0)
             :srca  (get register-symbol-map (nth icode 2 0) 0)
             :srcb  (get register-symbol-map (nth icode 3 0) 0)
-            :lit   (nth icode 4 0)})))
+            :lit   (nth icode 4 0)
+            :pc    (:pc (:fetch processor))})))
 
 
 (defn execute 
@@ -83,53 +117,55 @@
   processor state."
 
   [processor]
-  (let [icode (:decode processor)
-        srca  (register->val (get icode :srca 0) processor)
-        srcb  (register->val (get icode :srcb 0) processor)
-        dst   (get icode :dst 0)
-        icode (get icode :icode :add)]
+  (let [{:keys [icode srca srcb dst lit pc]} 
+        (get processor :decode
+             {:icode :add   :dst 0
+              :srca 0       :srcb 30
+              :lit 0        :pc -1})
+        srca  (register->val srca processor)
+        srcb  (register->val srcb processor)]
     (println "[execute  ]" (:decode processor))
     (as-> icode v
           (get opcode->fn v (constantly :halt))
           (v srca srcb processor dst)
+          (upgrade-writeback-command v)
+          (assoc v :pc (get-in processor [:decode :pc]))
           (assoc processor :execute v))))
 
 
 (defn writeback 
   "Pulls a writeback directive out of the processor state, and
-  performs the indicated update on the processor state. Updates are
-  either the value :halt, or vectors [:memory <addr> <val>] or
-  [:registers <addr> <val>]. Returns an updated state."
+  performs the indicated update on the processor state. Update command
+  have been restructured and are now maps
+  {:dst (U :registers :halt :memory) :addr Int :val Int}."  
 
   [processor]
-  (let [directive (get processor :execute [:registers 0 0])]
+  (let [directive (get processor :execute [:registers 30 0])
+        {:keys [dst addr val]} directive]
     (println "[writeback]" directive)
     (cond ;; special case to stop the show
-          (= :halt directive)
+          (= :halt dst)
             (assoc processor :halted true)
           
           ;; special case for printing
-          (and (= :registers (first directive))
-               (= 0 (second directive)))
-          (do (when-not (zero? (nth directive 2 0))
-                (print (char (nth directive 2 0))))
+          (and (= :registers dst)
+               (= 30 addr))
+            (do (when-not (zero? val)
+                  (print (char val)))
                 processor)
-
+            
           ;; special case for branching as we must flush the pipeline
-          (and (= :registers (first directive))
-               (= 31 (second directive)))
+          (and (= :registers dst)
+               (= 31 addr))
             (do (println "[writeback] flushing pipeline!")
                 (-> processor
                     (dissoc :fetch)
                     (dissoc :decode)
                     (dissoc :execute)
-                    (assoc-in [(nth directive 0 :registers) (nth directive 1 0)]
-                              (nth directive 2 0))))
+                    (assoc-in [:registers addr] val)))
 
           true
-          (assoc-in processor [(nth directive 0 :registers)
-                               (nth directive 1 0)]
-                 (nth directive 2 0)))))
+            (assoc-in processor [dst addr] val))))
 
 
 (defn step
