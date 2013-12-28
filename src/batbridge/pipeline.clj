@@ -2,82 +2,35 @@
   "Implements a simple pipelined processor. This processor makes no
   effort to perform branch prediction, instruction caching or memory
   caching. Correctness with respect to the pipeline and bubbles is
-  ensured however.")
+  ensured however."
+  (:require [batbridge.isa :refer :all]))
 
-;; Instructions are represented as being length five vectors of the
-;; structure [icode dst param param lit]. Instructions are stored in
-;; state memory as one would expect.
 
-(defn seq->instrs [seq]
-  (zipmap (range 0 (* 4 (count seq)) 4)
-          seq))
+;; Differences from the single cycle implementations.
+;;
+;; For the most part, the single cycle processor implementation is
+;; preserved. However, the pipelined instruction model requires more
+;; book keeping to track the PC value from which an instruction was
+;; fetched as well as other metadata about the processor state. In
+;; order to accomidate this metadata, the following changes to the
+;; single cycle processor data representation have been made.
+;;
+;; :fetch is now a map {:pc Int, :icode Icode}
+;; :decode now has a :pc key
+;; :execute is now a map {:cmd (U :registers :memory :halt),
+;;                        :dst Int, :val Int}
+;;
+;; These changes provide the information required to correctly present
+;; the PC value as specified by the ISA on a by-instruction basis as
+;; well as to store the data which will be required for branch
+;; prediction when the time comes to add such prediction.
 
-(defn instrs->state [instrs]
-  {:memory instrs
-   :registers {31 0}})
-
-;; The state structure will be represented as a map:
-;; {:memory {<int> <val>}
-;;  :registers {<int> <val>}
-;;  :halted <boolean>
-;; }
-
-;; In addition, the :fetch, :decode, :execute and :writeback keys will
-;; be used to store intermediate values used in computing the next
-;; state of the processor.
-
-(defn get-memory 
-  "Accesses an address in a processor state's memory, returning the
-  value there."
-  [p addr]
-  (get-in p [:memory addr] 0))
-
-(defn get-instr
-  "Accesses an address in a processor state's memory, returning the
-  value there. Provides a sane default for fetching instructions"
-  [p addr]
-  (get-in p [:memory addr] [:add 0 0 0 0]))
-
-(defn write-memory 
-  "Writes the argument value into the processor state's memory,
-  returning an updated processor state representation."
-  [p addr v]
-  (assoc-in p [:memory addr] v))
-
-(defn get-register
-  "Fetches a register value by register ID from a processor state,
-  returning the value."
-  [p reg]
-  (get-in p [:registers reg] 0))
-
-(defn halted? 
-  "Predicate to test whether a processor state record is halted."
-  [state]
-  (or (:halted state) false))
-
-(defn register->val 
-  "Helper function to compute a value from either a keyword register
-  alias or an integer register identifier. Returnes the value of
-  accessing the identified register."
-  [reg processor]
-  (case reg
-    (:r_ZERO 0) 0
-    (:r_IMM 30) (get (get processor :decode {}) :lit 0)
-    (:r_PC 31)  (get-register processor 31)
-    (-> processor 
-        :registers
-        (get reg 0))))
-
-(def register-symbol-map
-  "Maps register abbreviations and IDs to register IDs."
-  (-> (zipmap (range 30) (range 30))
-      (assoc :r_PC 31)
-      (assoc :r_IMM 30)
-      (assoc :r_ZERO 0)))
-
+;; FIXME:
+;;    This opcode listing is not specification complete. The control
+;;    instructions and a number of the data instructions are missing.
 (def opcode->fn
   "Maps opcode names to implementing functions."
-  {:add  (fn [x y _ dst] [:registers dst (+ x y)])
+  {:add  (fn [x y _ dst] {:cmd :registers :dst dst :val (+ x y)})
    :sub  (fn [x y _ dst] [:registers dst (- x y)])
    :mul  (fn [x y _ dst] [:registers dst (* x y)])
    :div  (fn [x y _ dst] [:registers dst (/ x y)])
@@ -95,6 +48,7 @@
   there from memory and sets the :fetch value key in the
   state. Increments the PC by the instruction width. Returns an
   updated state."
+
   [processor]
   (let [pc (get-register processor 31)
         icode (get-instr processor pc)]
@@ -102,13 +56,14 @@
     (println "[fetch    ]" pc "->" icode)
     (-> processor
         (update-in [:registers 31] (fn [x] (+ x 4)))
-        (assoc :fetch icode))))
+        (assoc :fetch {:icode icode :fpc pc}))))
 
 
 (defn decode
   "Dummy decode which translates a vector literal to an icode map. Not
   really important now because there is no binary decoding to do, but
   it'll be nice later."  
+
   [processor]
   (let [icode (get processor :fetch [:add 0 0 0 0])]
     (println "[decode   ]" icode)
@@ -126,6 +81,7 @@
   the implementation function to the parameters. Sets the :execute key
   with a state update directive which can use. Returns the updated
   processor state."
+
   [processor]
   (let [icode (:decode processor)
         srca  (register->val (get icode :srca 0) processor)
@@ -144,6 +100,7 @@
   performs the indicated update on the processor state. Updates are
   either the value :halt, or vectors [:memory <addr> <val>] or
   [:registers <addr> <val>]. Returns an updated state."
+
   [processor]
   (let [directive (get processor :execute [:registers 0 0])]
     (println "[writeback]" directive)
@@ -182,6 +139,7 @@
   design, we simply take the in-order steps and run them in the
   reverse order using the processor state as a set of latches for
   storing the state between clock 'cycles'."
+
   [state]
   (-> state
       writeback
@@ -194,6 +152,7 @@
   "Steps a processor state until such time as it becomes marked as
   'halted'. Makes no attempt to construct or validate a processor
   state, or handle errors therein." 
+
   [state]
   (loop [state state]
     (if-not (halted? state)
