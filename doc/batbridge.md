@@ -96,8 +96,8 @@ SL   0x3a 111010 ttttt aaaaa bbbbb iiiiiiiiiii
 SR   0x3b 111011 ttttt aaaaa bbbbb iiiiiiiiiii
      stores the right shift of a by b bits to t
  
-SLR  0x3c 111100 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the shift of a b bits to t
+SAL  0x3c 111100 ttttt aaaaa bbbbb iiiiiiiiiii
+     stores the arithmatic shift left of a b bits to t
 
 SAR  0x3d 111101 ttttt aaaaa bbbbb iiiiiiiiiii
      stores the arithmatic right shift of a by b bits to t
