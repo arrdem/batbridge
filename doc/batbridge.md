@@ -38,6 +38,17 @@ The immediate value, register #29 (0b1101)
  i : Immediate signed quantity
  _ : Value is not read. Set to 0 when assembled by convention.
 
+Opcodes are encoded as length 32 bit vectors. By convention the
+rightmost character in the bit field specification is the 1st bit, and
+the leftmost character is the 32nd bit. Note that this makes the
+literal field the lowest order parameter and the opcode the highest
+order parameter.
+
+So for the HLT instruction, having the opcode 0x0 as defined below the
+literal 0b00000000000000000000000000000000 would be a correct encoding
+of the halt instruction. For add, being opcode 0x30 again as defined
+below the encoding 0b11000000000000000000000000000000 would correctly
+place the opcode and zero all the other fields.
 ```
 
 ## Instruction set
