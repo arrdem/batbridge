@@ -44,7 +44,11 @@
   "Pulls the literal bits out of a word"
 
   [word]
-  (bit-and word 0x7ff))
+  (let [frag (bit-and word 0x7ff)]
+    (println (format "0x%X" frag))
+    (if (= 1024 (bit-and frag 1024)) ;; is the top bit set?
+      (bit-or -1024 frag)            ;; mask in all the higher bits
+      frag)))
 
 
 (defn word->symbol-map
@@ -57,5 +61,5 @@
    :dst   (word->dst word)
    :srca  (word->srca word)
    :srcb  (word->srcb word)
-   :lit   (word->lit word)})
+   :imm   (word->lit word)})
 
