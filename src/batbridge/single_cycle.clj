@@ -48,9 +48,7 @@
   [processor]
   (let [{:keys [icode srca srcb dst imm pc]}
         (get processor :decode
-             {:icode :add   :dst 0
-              :srca  0      :srcb 30
-              :imm   0      :pc -1})
+             isa/map-no-op)
         srca  (common/register->val processor srca pc imm)
         srcb  (common/register->val processor srcb pc imm)]
     (println "[execute  ]" (:decode processor))
