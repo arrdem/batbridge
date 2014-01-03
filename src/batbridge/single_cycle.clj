@@ -54,7 +54,7 @@
     ;; (println "[execute  ]" (:decode processor))
     (as-> icode v
           (get isa/opcode->fn v)
-          (v srca srcb processor dst)
+          (v srca srcb processor d)
           (common/upgrade-writeback-command v)
           (assoc v :pc (get-in processor [:decode :pc]))
           (assoc processor :execute v))))
