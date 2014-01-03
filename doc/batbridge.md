@@ -57,10 +57,10 @@ HLT  0x00 000000 _____ _____ _____ ___________
      halts the machine immediately
 
 LD   0x10 010000 ttttt aaaaa xxxxx iiiiiiiiiii
-     loads the word a + 4 * x to register dst
+     loads the word a + 4 * x to t
 
 ST   0x11 010001 sssss aaaaa xxxxx iiiiiiiiiii
-     stores the word in register src to the address a + 4 * x
+     stores the word in register s to the address a + 4 * x
 
 IFLT 0x20 100000 _____ aaaaa bbbbb iiiiiiiiiii
      execute the next instruction IFF a < b
