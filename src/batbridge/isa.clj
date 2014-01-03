@@ -15,10 +15,10 @@
   instruction by decode."
 
   {:icode :add
-   :dst   :r_ZERO
-   :srca  :r_ZERO
-   :srcb  :r_ZERO
-   :lit   0
+   :d     :r_ZERO
+   :a     :r_ZERO
+   :b     :r_ZERO
+   :i     0
    :pc    0})
 
 
@@ -55,19 +55,19 @@
    :st   (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
 
    :iflt (fn [x y p dst]
-           (let [pc (get-register 31)]
+           (let [pc (get-register p 31)]
              [:registers 31 (if (< x y) pc (+ pc 4))]))
 
    :ifle (fn [x y p dst]
-           (let [pc (get-register 31)]
+           (let [pc (get-register p 31)]
              [:registers 31 (if (<= x y) pc (+ pc 4))]))
 
    :ifeq (fn [x y p dst]
-           (let [pc (get-register 31)]
+           (let [pc (get-register p 31)]
              [:registers 31 (if (= x y) pc (+ pc 4))]))
 
    :ifne (fn [x y p dst]
-           (let [pc (get-register 31)]
+           (let [pc (get-register p 31)]
              [:registers 31 (if-not (= x y) pc (+ pc 4))]))
 
    :add  (fn [x y _ dst] [:registers dst (+ x y)])
@@ -123,14 +123,14 @@
   "Pulls appart a vector instruction, building the symbolic assembler
   map which the Clojure simulators are designed to work with."
   [vec]
-  (let [[op dst srca srcb lit] vec]
-    (doseq [i [op dst srca srcb lit]]
+  (let [[op d a b i] vec]
+    (doseq [i [op d a b i]]
       (assert (not (nil? i))))
     {:icode op
-     :dst   dst
-     :srca  srca
-     :srcb  srcb
-     :imm   lit}))
+     :d     d
+     :a     a
+     :b     b
+     :i     i}))
 
 
 (defn normalize-icode
@@ -142,11 +142,11 @@
 (defn normalize-registers
   "Does symbol to integer normalization for the register parameters of
   a decoded instruction."
-  [{:keys [srca srcb dst] :as decode}]
+  [{:keys [a b d] :as decode}]
   (-> decode
-      (assoc :srca (get register-symbol-map srca srca))
-      (assoc :srcb (get register-symbol-map srcb srcb))
-      (assoc :dst  (get register-symbol-map dst dst))))
+      (assoc :a (get register-symbol-map a a))
+      (assoc :b (get register-symbol-map b b))
+      (assoc :d (get register-symbol-map d d))))
 
 
 (defn decode-instr
