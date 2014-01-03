@@ -45,7 +45,6 @@
 
   [word]
   (let [frag (bit-and word 0x7ff)]
-    (println (format "0x%X" frag))
     (if (= 1024 (bit-and frag 1024)) ;; is the top bit set?
       (bit-or -1024 frag)            ;; mask in all the higher bits
       frag)))
