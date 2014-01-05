@@ -57,8 +57,8 @@
 
   [word]
   {:icode (word->opcode word)
-   :dst   (word->dst word)
-   :srca  (word->srca word)
-   :srcb  (word->srcb word)
-   :imm   (word->lit word)})
+   :d     (word->dst word)
+   :a     (word->srca word)
+   :b     (word->srcb word)
+   :i     (word->lit word)})
 
