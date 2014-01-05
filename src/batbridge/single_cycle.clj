@@ -46,12 +46,12 @@
   processor state."
 
   [processor]
-  (let [{:keys [icode a b d i pc]}
+  (let [{:keys [icode a b d i pc] :as decode}
         (get processor :decode
              isa/map-no-op)
         srca  (common/register->val processor a pc i)
         srcb  (common/register->val processor b pc i)]
-    ;; (println "[execute  ]" (:decode processor))
+    (println "[execute  ]" decode)
     (as-> icode v
           (get isa/opcode->fn v)
           (v srca srcb processor d)
