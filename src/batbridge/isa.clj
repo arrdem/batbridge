@@ -15,9 +15,9 @@
   instruction by decode."
 
   {:icode :add
-   :d     :r_ZERO
-   :a     :r_ZERO
-   :b     :r_ZERO
+   :d     30
+   :a     30
+   :b     30
    :i     0
    :pc    -1})
 
@@ -26,7 +26,7 @@
   "Vector constant representing a no-op. May be used by fetch stages
   in lieu of a meaningful fetched value." 
 
-  [:add :r_ZERO :r_ZERO :r_ZERO 0])
+  [:add 30 30 30 0])
 
 
 (def bytecode-no-op
