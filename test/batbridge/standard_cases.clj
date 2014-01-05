@@ -61,7 +61,7 @@
    24  [:sub  3 3 :r_IMM  1]           ;; dec the loop constant
    28  [:ifne 0 3 :r_ZERO 0]           ;; test if we've zeroed the loop counter yet
    32  [:add  :r_PC :r_ZERO :r_IMM 12] ;; if not jump to the top of the loop
-   36  [:halt 0 0 0 0]                 ;; otherwise halt
+   36  [:hlt 0 0 0 0]                 ;; otherwise halt
    }
 
   (fn [state]
@@ -87,7 +87,7 @@
    12  [:sub  1 1 :r_IMM  1]          ;; dec the loop constant
    16  [:ifne 0 1 :r_ZERO 0]          ;; test if we've zeroed the loop counter yet
    20  [:add  :r_PC :r_ZERO :r_IMM 8] ;; if not jump to the top of the loop
-   24  [:halt 0 0 0 0]                ;; otherwise halt
+   24  [:hlt 0 0 0 0]                ;; otherwise halt
    }
 
   (fn [state]
