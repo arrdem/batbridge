@@ -50,7 +50,7 @@
   generic with respect to processor state, and can therefor be re-used
   by all processors."
 
-  {:halt (fn [_ _ _ _  ] [:halt nil nil])
+  {:hlt  (fn [_ _ _ _  ] [:halt nil nil])
    :ld   (fn [x y p dst] [:registers dst (get-memory p (+ x (* 4 y)))])
    :st   (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
 
@@ -86,7 +86,7 @@
 (def bytecode->opcode
   "Maps bytecodes to their opcodes as per the spec."
 
-  {0x00 :halt
+  {0x00 :hlt
    0x10 :ld
    0x11 :st
    0x20 :iflt
