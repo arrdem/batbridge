@@ -19,7 +19,7 @@
    :a     :r_ZERO
    :b     :r_ZERO
    :i     0
-   :pc    0})
+   :pc    -1})
 
 
 (def vec-no-op
@@ -40,7 +40,7 @@
 (def writeback-no-op
   "Writeback instruction which will do exactly nothing!"
 
-  {:dst :registers :addr 30 :val 0})
+  {:dst :registers :addr 30 :val 0 :pc -1})
 
 
 ;; The  common opcode implementation map
@@ -86,7 +86,7 @@
 (def bytecode->opcode
   "Maps bytecodes to their opcodes as per the spec."
 
-  {0x00 :htl
+  {0x00 :halt
    0x10 :ld
    0x11 :st
    0x20 :iflt
