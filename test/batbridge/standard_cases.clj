@@ -15,7 +15,7 @@
 
 
 (defmacro deftest [sym opcodes predicate bound]
-  `(def ~sym (->ps-test (-> ~opcodes c/seq->instrs) ~predicate ~bound)))
+  `(def ~sym (->ps-test ~opcodes ~predicate ~bound)))
 
 
 (defn run-test 
