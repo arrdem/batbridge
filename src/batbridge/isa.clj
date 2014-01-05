@@ -67,7 +67,7 @@
              [:registers 31 (if (= x y) pc (+ pc 4))]))
 
    :ifne (fn [x y p dst]
-           (let [pc (get-register p 31)]
+           (let [pc (get-in p [:decode :pc])]
              [:registers 31 (if-not (= x y) pc (+ pc 4))]))
 
    :add  (fn [x y _ dst] [:registers dst (+ x y)])

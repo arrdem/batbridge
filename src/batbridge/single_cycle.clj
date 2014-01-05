@@ -15,10 +15,11 @@
 
   [processor]
   (let [pc (common/get-register processor 31)
-        icode (common/get-memory processor pc)]
+        icode (common/get-memory processor pc)
+        pc (+ pc 4)]
     (println "[fetch    ]" pc "->" icode)
     (-> processor
-        (update-in [:registers 31] (fn [x] (+ x 4)))
+        (assoc-in [:registers 31] pc)
         (assoc :fetch {:icode icode :pc pc}))))
 
 
