@@ -58,7 +58,6 @@
    [:hlt  0  0  0  0 ] ;; otherwise halt
    ])
 
-
 (deftest fib-test
   ;; This test computes fib(15) and stores the result to r2.
   ;; r0 is used to store fib(n-2)
@@ -66,8 +65,7 @@
   ;; r2 is a scratch register used to store fib(n)
   ;; r3 is used to count down from 15 for loop control
 
-  (zipmap (range 0 (* (count fib-icodes) 4) 4)
-          fib-icodes)
+  (c/seq->instrs fib-icodes)
 
   (fn [state]
     (t/is (= (c/get-register state 2)  ;; fib 15 with th (0,1) as the base case
@@ -76,22 +74,25 @@
     true))
 
 
+(def fact-icodes
+  [
+   [:add  0  30 29 1 ] ;; preload fact(0)
+   [:add  1  30 29 10] ;; the loop bound
+
+                       ;; write the fact loop
+   [:mul  0  0  1  0 ] ;; Multiply fact(n-1) and n
+   [:sub  1  1  29 1 ] ;; dec the loop constant
+   [:ifne 0  1  30 0 ] ;; test if we've zeroed the loop counter yet
+   [:add  31 30 29 8 ] ;; if not jump to the top of the loop
+   [:hlt  0  0  0  0 ] ;; otherwise halt
+   ])
+
 (deftest fact-test
   ;; This test computes fact(10) and stores the result to r0. The
   ;; control flow used is essentially the same as that in fib-test.
   ;; This is essentially the same as (reduce * (range 1 11)).
 
-  {;; load constants into registers
-   0   [:add  0 :r_ZERO :r_IMM 1]     ;; preload fact(0)
-   4   [:add  1 :r_ZERO :r_IMM 10]    ;; the loop bound
-
-   ;; write the fact loop
-   8   [:mul  0 0 1 0]
-   12  [:sub  1 1 :r_IMM  1]          ;; dec the loop constant
-   16  [:ifne 0 1 :r_ZERO 0]          ;; test if we've zeroed the loop counter yet
-   20  [:add  :r_PC :r_ZERO :r_IMM 8] ;; if not jump to the top of the loop
-   24  [:hlt 0 0 0 0]                ;; otherwise halt
-   }
+  (c/seq->instrs fact-icodes)
 
   (fn [state]
     (t/is (= (c/get-register state 0)
