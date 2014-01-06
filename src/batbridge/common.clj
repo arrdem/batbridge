@@ -88,3 +88,11 @@
   
   [[dst addr v]]
   {:dst dst :addr addr :val v})
+
+
+(defn fmt-instr
+  "Formats a map instruction as a vector instruction. Intended for use
+  in debugging / inspecting decoded word instructions."
+
+  [{:keys [icode d a b i] :as  map-instr}]
+  [icode d a b i])
