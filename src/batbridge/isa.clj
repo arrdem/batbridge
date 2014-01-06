@@ -123,8 +123,8 @@
 (defn vec->symbol-map
   "Pulls appart a vector instruction, building the symbolic assembler
   map which the Clojure simulators are designed to work with."
-  [vec]
-  (let [[op d a b i] vec]
+  [vec-instr]
+  (let [[op d a b i] vec-instr]
     (doseq [i [op d a b i]]
       (assert (not (nil? i))
               (format "Vector decoding failed, nil parameter!")))
@@ -159,9 +159,10 @@
   out of order processor that task is left to the processor
   simulators."
 
-  [icode]
-  (cond-> icode
-          (vector? icode)   vec->symbol-map
-          (integer?  icode) word->symbol-map
-          true              normalize-icode
-          true              normalize-registers))
+  [icode-maybe]
+  (when-not (nil? icode-maybe)
+    (cond-> icode-maybe
+            (vector?  icode-maybe) vec->symbol-map
+            (integer? icode-maybe) word->symbol-map
+            true                   normalize-icode
+            true                   normalize-registers)))
