@@ -11,11 +11,11 @@
             [clojure.test :as t]))
 
 
-(defrecord ps-test [opcodes predicate bound])
+(defrecord ps-test [opcodes predicate])
 
 
-(defmacro deftest [sym opcodes predicate bound]
-  `(def ~sym (->ps-test ~opcodes ~predicate ~bound)))
+(defmacro deftest [sym opcodes predicate]
+  `(def ~sym (->ps-test ~opcodes ~predicate)))
 
 
 (defn run-test
@@ -24,8 +24,8 @@
   used in running the unstructions. Uses clojure.test/is for assertion
   checking."
 
-  [test step]
-  (let [{:keys [opcodes predicate bound]} test
+  [test step bound]
+  (let [{:keys [opcodes predicate]} test
         state (c/instrs->state opcodes)]
     ;; (println "[]" opcodes)
     ;; (println "[]" predicate)
@@ -73,9 +73,7 @@
     (t/is (= (c/get-register state 2)  ;; fib 15 with th (0,1) as the base case
              610))
     (t/is (c/halted? state))           ;; the processor should have halted correctly
-    true)
-
-  1000)
+    true))
 
 
 (deftest fact-test
@@ -99,6 +97,4 @@
     (t/is (= (c/get-register state 0)
              3628800))                ;; fact(10)
     (t/is (c/halted? state)   )       ;; the processor should have halted correctly
-    true)
-
-  1000)
+    true))
