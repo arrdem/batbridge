@@ -42,6 +42,23 @@
 
 ;;------------------------------------------------------------------------------
 
+(def fib-icodes
+  [;; load constants into registers
+   [:add  0  30 29 0 ] ;; preload fib(0)
+   [:add  1  30 29 1 ] ;; preload fib(1)
+   [:add  3  30 29 14] ;; the loop bound
+
+                       ;; write the fib loop
+   [:add  2  1  0  0 ] ;; add fib(n-2) + fib(n-1), store to fib
+   [:add  0  1  30 0 ] ;; move fib(n-1) down
+   [:add  1  2  30 0 ] ;; move fib(n) down
+   [:sub  3  3  29 1 ] ;; dec the loop constant
+   [:ifne 0  3  30 0 ] ;; test if we've zeroed the loop counter yet
+   [:add  31 30 29 12] ;; if not jump to the top of the loop
+   [:hlt  0  0  0  0 ] ;; otherwise halt
+   ])
+
+
 (deftest fib-test
   ;; This test computes fib(15) and stores the result to r2.
   ;; r0 is used to store fib(n-2)
@@ -49,20 +66,8 @@
   ;; r2 is a scratch register used to store fib(n)
   ;; r3 is used to count down from 15 for loop control
 
-  {;; load constants into registers
-   0   [:add  0 :r_ZERO :r_IMM 0]      ;; preload fib(0)
-   4   [:add  1 :r_ZERO :r_IMM 1]      ;; preload fib(1)
-   8   [:add  3 :r_ZERO :r_IMM 14]     ;; the loop bound
-
-   ;; write the fib loop
-   12  [:add  2 1 0 0]                 ;; add fib(n-2) + fib(n-1), store to fib
-   16  [:add  0 1 :r_ZERO 0]           ;; move fib(n-1) down
-   20  [:add  1 2 :r_ZERO 0]           ;; move fib(n) down
-   24  [:sub  3 3 :r_IMM  1]           ;; dec the loop constant
-   28  [:ifne 0 3 :r_ZERO 0]           ;; test if we've zeroed the loop counter yet
-   32  [:add  :r_PC :r_ZERO :r_IMM 12] ;; if not jump to the top of the loop
-   36  [:hlt 0 0 0 0]                 ;; otherwise halt
-   }
+  (zipmap (range 0 (* (count fib-icodes) 4) 4)
+          fib-icodes)
 
   (fn [state]
     (t/is (= (c/get-register state 2)  ;; fib 15 with th (0,1) as the base case
