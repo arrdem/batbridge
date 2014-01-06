@@ -126,7 +126,8 @@
   [vec]
   (let [[op d a b i] vec]
     (doseq [i [op d a b i]]
-      (assert (not (nil? i))))
+      (assert (not (nil? i))
+              (format "Vector decoding failed, nil parameter!")))
     {:icode op
      :d     d
      :a     a
