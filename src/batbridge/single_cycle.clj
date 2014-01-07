@@ -16,11 +16,11 @@
   [processor]
   (let [pc (common/get-register processor 31)
         icode (common/get-memory processor pc)
-        pc (+ pc 4)]
+        npc (+ pc 4)]
     (println "[fetch    ]" pc "->" icode)
     (-> processor
-        (assoc-in [:registers 31] pc)
-        (assoc :fetch {:icode icode :pc pc}))))
+        (assoc-in [:registers 31] npc)
+        (assoc :fetch {:icode icode :pc npc}))))
 
 
 (defn decode
@@ -33,6 +33,9 @@
             (get processor :fetch {:icode isa/vec-no-op
                                    :pc    -1})]
     (println "[decode   ]" icode)
+    (println "[decode   ]" (-> icode
+                               isa/decode-instr
+                               common/fmt-instr))
     (as-> icode v 
           (isa/decode-instr v)
           (assoc v :pc pc)
@@ -94,9 +97,9 @@
                (= 31 addr))
             (do (println "[writeback] flushing pipeline!")
                 (-> processor
-                    (dissoc :fetch)
-                    (dissoc :decode)
-                    (dissoc :execute)
+                    ;(dissoc :fetch)
+                    ;(dissoc :decode)
+                    ;(dissoc :execute) 
                     (assoc-in [:registers addr] val)))
 
           true
