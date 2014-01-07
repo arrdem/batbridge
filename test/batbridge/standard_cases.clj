@@ -5,6 +5,7 @@
 
   (:require [batbridge [assembler :as a]
                        [common    :as c]
+                       [isa       :as i]
                        [bytecode  :as b]]
             [toothpick.assembler :refer [assemble]]
             [toothpick.isa.batbridge :refer [batbridge]]
@@ -40,8 +41,8 @@
                       (dec bound))))))))
 
 
+;; Test suite based on computing fibonacci numbers
 ;;------------------------------------------------------------------------------
-
 (def fib-icodes
   [;; load constants into registers
    [:add  0  30 29 0 ] ;; preload fib(0)
@@ -73,7 +74,31 @@
     (t/is (c/halted? state))           ;; the processor should have halted correctly
     true))
 
+(deftest fib-byte-test
+  ;; This test does the same thing as fib-test, but using byte encoded
+  ;; instructions from Toothpick.
+  (assemble batbridge fib-icodes)
+  
+  (fn [state]
+    (t/is (= (c/get-register state 2)  ;; fib 15 with th (0,1) as the base case
+             610))
+    (t/is (c/halted? state))           ;; the processor should have halted correctly
+    true))
 
+(t/deftest fib-encoding-equality-test
+  ;; Tests to make sure that round tripping through the assembler does
+  ;; no damange to the instruction sequence for the fib test.
+  (doseq [p (->> fib-byte-test
+                 :opcodes
+                 (map b/word->symbol-map)
+                 (map i/decode-instr)
+                 (map c/fmt-instr)
+                 (map vector fib-icodes))]
+    (t/is (= (first p) (second p)))))
+
+
+;; Test suite based on computing factorials
+;;------------------------------------------------------------------------------
 (def fact-icodes
   [
    [:add  0  30 29 1 ] ;; preload fact(0)
@@ -99,3 +124,27 @@
              3628800))                ;; fact(10)
     (t/is (c/halted? state)   )       ;; the processor should have halted correctly
     true))
+
+(deftest fact-byte-test
+  ;; This test computes fact(10) and stores the result to r0. The
+  ;; control flow used is essentially the same as that in fib-test.
+  ;; This is essentially the same as (reduce * (range 1 11)).
+
+  (assemble batbridge fact-icodes)
+
+  (fn [state]
+    (t/is (= (c/get-register state 0)
+             3628800))                ;; fact(10)
+    (t/is (c/halted? state)   )       ;; the processor should have halted correctly
+    true))
+
+(t/deftest fact-encoding-equality-test
+  ;; Tests to make sure that round tripping through the assembler does
+  ;; no damange to the instruction sequence for the fib test.
+  (doseq [p (->> fact-byte-test
+                 :opcodes
+                 (map b/word->symbol-map)
+                 (map i/decode-instr)
+                 (map c/fmt-instr)
+                 (map vector fact-icodes))]
+    (t/is (= (first p) (second p)))))
