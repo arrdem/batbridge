@@ -77,7 +77,9 @@
 (deftest fib-byte-test
   ;; This test does the same thing as fib-test, but using byte encoded
   ;; instructions from Toothpick.
-  (assemble batbridge fib-icodes)
+  (->> fib-icodes
+       (assemble batbridge)
+       (c/seq->instrs))
   
   (fn [state]
     (t/is (= (c/get-register state 2)  ;; fib 15 with th (0,1) as the base case
@@ -88,8 +90,8 @@
 (t/deftest fib-encoding-equality-test
   ;; Tests to make sure that round tripping through the assembler does
   ;; no damange to the instruction sequence for the fib test.
-  (doseq [p (->> fib-byte-test
-                 :opcodes
+  (doseq [p (->> fib-icodes
+                 (assemble batbridge)
                  (map b/word->symbol-map)
                  (map i/decode-instr)
                  (map c/fmt-instr)
@@ -122,7 +124,7 @@
   (fn [state]
     (t/is (= (c/get-register state 0)
              3628800))                ;; fact(10)
-    (t/is (c/halted? state)   )       ;; the processor should have halted correctly
+    (t/is (c/halted? state))          ;; the processor should have halted correctly
     true))
 
 (deftest fact-byte-test
@@ -130,19 +132,21 @@
   ;; control flow used is essentially the same as that in fib-test.
   ;; This is essentially the same as (reduce * (range 1 11)).
 
-  (assemble batbridge fact-icodes)
+    (->> fact-icodes
+       (assemble batbridge)
+       (c/seq->instrs))
 
   (fn [state]
     (t/is (= (c/get-register state 0)
              3628800))                ;; fact(10)
-    (t/is (c/halted? state)   )       ;; the processor should have halted correctly
+    (t/is (c/halted? state))          ;; the processor should have halted correctly
     true))
 
 (t/deftest fact-encoding-equality-test
   ;; Tests to make sure that round tripping through the assembler does
   ;; no damange to the instruction sequence for the fib test.
-  (doseq [p (->> fact-byte-test
-                 :opcodes
+  (doseq [p (->> fact-icodes
+                 (assemble batbridge)
                  (map b/word->symbol-map)
                  (map i/decode-instr)
                  (map c/fmt-instr)
