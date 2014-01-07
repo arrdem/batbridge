@@ -55,10 +55,10 @@
   Clojure simulators are designed to work with and which a human can
   reasonably debug."
 
-  [word]
-  {:icode (word->opcode word)
-   :d     (word->dst word)
-   :a     (word->srca word)
-   :b     (word->srcb word)
-   :i     (word->lit word)})
+  [word-instr]
+  {:icode (word->opcode word-instr)
+   :d     (word->dst    word-instr)
+   :a     (word->srca   word-instr)
+   :b     (word->srcb   word-instr)
+   :i     (word->lit    word-instr)})
 
