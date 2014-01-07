@@ -16,12 +16,12 @@
          (bytecode/word->lit  word)   4)
 
     ;; test that word->symbol-map behaves as expected
-    (let [{:keys [srca srcb icode dst lit]} 
+    (let [{:keys [a b icode d i]} 
           (bytecode/word->symbol-map word)]
       (are [expected got] (= expected got)
            icode 0
-           dst   1
-           srca  2 
-           srcb  3
-           lit   4))))
+           d     1
+           a     2 
+           b     3
+           i     4))))
   

@@ -15,11 +15,12 @@
 
   [processor]
   (let [pc (common/get-register processor 31)
-        icode (common/get-memory processor pc)]
+        icode (common/get-memory processor pc)
+        npc (+ pc 4)]
     (println "[fetch    ]" pc "->" icode)
     (-> processor
-        (update-in [:registers 31] (fn [x] (+ x 4)))
-        (assoc :fetch {:icode icode :pc pc}))))
+        (assoc-in [:registers 31] npc)
+        (assoc :fetch {:icode icode :pc npc}))))
 
 
 (defn decode
@@ -32,6 +33,9 @@
             (get processor :fetch {:icode isa/vec-no-op
                                    :pc    -1})]
     (println "[decode   ]" icode)
+    (println "[decode   ]" (-> icode
+                               isa/decode-instr
+                               common/fmt-instr))
     (as-> icode v 
           (isa/decode-instr v)
           (assoc v :pc pc)
@@ -46,17 +50,15 @@
   processor state."
 
   [processor]
-  (let [{:keys [icode srca srcb dst imm pc]}
+  (let [{:keys [icode a b d i pc] :as decode}
         (get processor :decode
-             {:icode :add   :dst 0
-              :srca  0      :srcb 30
-              :imm   0      :pc -1})
-        srca  (common/register->val processor srca pc imm)
-        srcb  (common/register->val processor srcb pc imm)]
-    (println "[execute  ]" (:decode processor))
+             isa/map-no-op)
+        srca  (common/register->val processor a pc i)
+        srcb  (common/register->val processor b pc i)]
+    (println "[execute  ]" decode)
     (as-> icode v
           (get isa/opcode->fn v)
-          (v srca srcb processor dst)
+          (v srca srcb processor d)
           (common/upgrade-writeback-command v)
           (assoc v :pc (get-in processor [:decode :pc]))
           (assoc processor :execute v))))
@@ -95,9 +97,9 @@
                (= 31 addr))
             (do (println "[writeback] flushing pipeline!")
                 (-> processor
-                    (dissoc :fetch)
-                    (dissoc :decode)
-                    (dissoc :execute)
+                    ;(dissoc :fetch)
+                    ;(dissoc :decode)
+                    ;(dissoc :execute) 
                     (assoc-in [:registers addr] val)))
 
           true

@@ -45,7 +45,6 @@
 
   [word]
   (let [frag (bit-and word 0x7ff)]
-    (println (format "0x%X" frag))
     (if (= 1024 (bit-and frag 1024)) ;; is the top bit set?
       (bit-or -1024 frag)            ;; mask in all the higher bits
       frag)))
@@ -56,10 +55,10 @@
   Clojure simulators are designed to work with and which a human can
   reasonably debug."
 
-  [word]
-  {:icode (word->opcode word)
-   :dst   (word->dst word)
-   :srca  (word->srca word)
-   :srcb  (word->srcb word)
-   :imm   (word->lit word)})
+  [word-instr]
+  {:icode (word->opcode word-instr)
+   :d     (word->dst    word-instr)
+   :a     (word->srca   word-instr)
+   :b     (word->srcb   word-instr)
+   :i     (word->lit    word-instr)})
 

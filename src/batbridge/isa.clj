@@ -15,18 +15,18 @@
   instruction by decode."
 
   {:icode :add
-   :dst   :r_ZERO
-   :srca  :r_ZERO
-   :srcb  :r_ZERO
-   :lit   0
-   :pc    0})
+   :d     30
+   :a     30
+   :b     30
+   :i     0
+   :pc    -1})
 
 
 (def vec-no-op
   "Vector constant representing a no-op. May be used by fetch stages
   in lieu of a meaningful fetched value." 
 
-  [:add :r_ZERO :r_ZERO :r_ZERO 0])
+  [:add 30 30 30 0])
 
 
 (def bytecode-no-op
@@ -40,7 +40,7 @@
 (def writeback-no-op
   "Writeback instruction which will do exactly nothing!"
 
-  {:dst :registers :addr 30 :val 0})
+  {:dst :registers :addr 30 :val 0 :pc -1})
 
 
 ;; The  common opcode implementation map
@@ -50,24 +50,24 @@
   generic with respect to processor state, and can therefor be re-used
   by all processors."
 
-  {:halt (fn [_ _ _ _  ] [:halt nil nil])
+  {:hlt  (fn [_ _ _ _  ] [:halt nil nil])
    :ld   (fn [x y p dst] [:registers dst (get-memory p (+ x (* 4 y)))])
    :st   (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
 
    :iflt (fn [x y p dst]
-           (let [pc (get-register 31)]
+           (let [pc (get-register p 31)]
              [:registers 31 (if (< x y) pc (+ pc 4))]))
 
    :ifle (fn [x y p dst]
-           (let [pc (get-register 31)]
+           (let [pc (get-register p 31)]
              [:registers 31 (if (<= x y) pc (+ pc 4))]))
 
    :ifeq (fn [x y p dst]
-           (let [pc (get-register 31)]
+           (let [pc (get-register p 31)]
              [:registers 31 (if (= x y) pc (+ pc 4))]))
 
    :ifne (fn [x y p dst]
-           (let [pc (get-register 31)]
+           (let [pc (get-in p [:decode :pc])]
              [:registers 31 (if-not (= x y) pc (+ pc 4))]))
 
    :add  (fn [x y _ dst] [:registers dst (+ x y)])
@@ -86,12 +86,13 @@
 (def bytecode->opcode
   "Maps bytecodes to their opcodes as per the spec."
 
-  {0x00 :htl
+  {0x00 :hlt
    0x10 :ld
    0x11 :st
    0x20 :iflt
    0x21 :ifle
-   0x22 :ifne
+   0x22 :ifeq
+   0x23 :ifne
    0x30 :add
    0x31 :sub
    0x32 :div
@@ -122,15 +123,16 @@
 (defn vec->symbol-map
   "Pulls appart a vector instruction, building the symbolic assembler
   map which the Clojure simulators are designed to work with."
-  [vec]
-  (let [[op dst srca srcb lit] vec]
-    (doseq [i [op dst srca srcb lit]]
-      (assert (not (nil? i))))
+  [vec-instr]
+  (let [[op d a b i] vec-instr]
+    (doseq [i [op d a b i]]
+      (assert (not (nil? i))
+              (format "Vector decoding failed, nil parameter!")))
     {:icode op
-     :dst   dst
-     :srca  srca
-     :srcb  srcb
-     :imm   lit}))
+     :d     d
+     :a     a
+     :b     b
+     :i     i}))
 
 
 (defn normalize-icode
@@ -142,11 +144,11 @@
 (defn normalize-registers
   "Does symbol to integer normalization for the register parameters of
   a decoded instruction."
-  [{:keys [srca srcb dst] :as decode}]
+  [{:keys [a b d] :as decode}]
   (-> decode
-      (assoc :srca (get register-symbol-map srca srca))
-      (assoc :srcb (get register-symbol-map srcb srcb))
-      (assoc :dst  (get register-symbol-map dst dst))))
+      (assoc :a (get register-symbol-map a a))
+      (assoc :b (get register-symbol-map b b))
+      (assoc :d (get register-symbol-map d d))))
 
 
 (defn decode-instr
@@ -157,9 +159,10 @@
   out of order processor that task is left to the processor
   simulators."
 
-  [icode]
-  (cond-> icode
-          (vector? icode)   vec->symbol-map
-          (integer?  icode) word->symbol-map
-          true              normalize-icode
-          true              normalize-registers))
+  [icode-maybe]
+  (when-not (nil? icode-maybe)
+    (cond-> icode-maybe
+            (vector?  icode-maybe) vec->symbol-map
+            (integer? icode-maybe) word->symbol-map
+            true                   normalize-icode
+            true                   normalize-registers)))
