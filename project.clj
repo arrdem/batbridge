@@ -1,4 +1,4 @@
-(defproject me.arrdem/batbridge "0.1.0-SNAPSHOT"
+(defproject me.arrdem/batbridge "0.1.0"
   :description
   "A suite of processor simulators based on the Batbridge architecture"
   :url "http://www.github.com/arrdem/batbridge/"
