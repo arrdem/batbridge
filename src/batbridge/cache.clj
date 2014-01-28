@@ -89,8 +89,8 @@
     (cache-write! (:else cache) key v)))
 
 
-(defn make-cache-higherarchy 
-  "Builds a cache higherarchy from a pairs [latency, size]. The result
+(defn make-cache-hierarchy 
+  "Builds a cache hierarchy from a pairs [latency, size]. The result
   is a nested set of empty cache maps nested in pair order.
 
   Ex. a sequence [[1 8] [2 16]] would build a cache of latency 1 and
