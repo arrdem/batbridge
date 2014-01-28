@@ -15,28 +15,6 @@
        (>= x 0)))
 
 
-(defn seq->instrs
-  "Translates a sequence of _vector_ instructions to a map of word IDs
-   to instructions. Note that this _cannot_ be used for a bytecode
-   interpreter because it approximates a byte buffer by aligning
-   instructions at multiples of 4 and contains vector instructions
-   rather than bytecodes."
-
-  [seq] 
-  (zipmap (range 0 (* 4 (count seq)) 4) 
-          seq))
-
-
-(defn instrs->state 
-  "Generates the minimum of a processor state required to invoke
-  a (step) implementation successfully. Agnostic as to the details of
-  the instructions value."  
-  
-  [instructions]
-  {:memory instructions
-   :registers {31 0}})
-
-
 (defn halted? 
   "Common predicate for testing whether a processor state has become
   halted or not yet."
@@ -118,3 +96,28 @@
       (cache-write! (:memory initial-state) k v))
 
     initial-state))
+
+
+(defn seq->instrs
+  "Translates a sequence of _vector_ instructions to a map of word IDs
+   to instructions. Note that this _cannot_ be used for a bytecode
+   interpreter because it approximates a byte buffer by aligning
+   instructions at multiples of 4 and contains vector instructions
+   rather than bytecodes."
+
+  [seq] 
+  (zipmap (range 0 (* 4 (count seq)) 4) 
+          seq))
+
+
+(defn instrs->state 
+  "Generates the minimum of a processor state required to invoke
+  a (step) implementation successfully. Agnostic as to the details of
+  the instructions value. All of main memory is initialized to zero,
+  save those addresses specified in the instruction map. The PC is
+  initialized to zero."
+  
+  [instructions]
+  (make-processor
+   {:memory instructions
+    :registers {31 0}}))
