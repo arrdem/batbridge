@@ -1,6 +1,8 @@
 (ns batbridge.common
   "Bits and pieces which were pulled out of various Batbridge
-  simulators on the basis of constituting code repetition.")
+  simulators on the basis of constituting code repetition."
+  (:require [batbridge.cache :refer [make-cache-higherarchy cache-get!
+                                     cache-write!]]))
 
 
 (defn register? 
@@ -48,18 +50,21 @@
 (defn get-memory
   "Accesses an address in a processor state's memory, returning the
   value there. Defaults to 0, so the processor will halt if it jumps
-  into unset instructions."
+  into unset instructions. Note that this function will behave badly
+  if there is not an installed cache higherarchy."
 
   [p addr]
-  (get-in p [:memory addr] 0))
+  (cache-get! (:memory p) addr))
 
 
 (defn write-memory
   "Writes the argument value into the processor state's memory,
-  returning an updated processor state representation."
+  returning an updated processor state representation. Note that this
+  function will behave badly if there is not an installed cache
+  higherarchy."
 
   [p addr v]
-  (assoc-in p [:memory addr] v))
+  (cache-write! (:memory p) addr v))
 
 
 (defn get-register
@@ -67,7 +72,7 @@
   returning the value."
 
   [p reg]
-  (get-in p [:registers reg] 0))
+  (get-in p [:registers reg] 0))     
 
 
 (defn register->val
