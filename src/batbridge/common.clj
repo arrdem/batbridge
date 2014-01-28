@@ -101,3 +101,20 @@
 
   [{:keys [icode d a b i] :as  map-instr}]
   [icode d a b i])
+
+
+(defn make-processor
+  "Builds a processor map by installing values in registers and the
+  memory higherarchy. This function transforms what has been the
+  traditional inline notation for a processor to a fully fledged cache
+  higherarchy equiped structure." 
+
+  [{:keys [regs memory]}]
+  (let [initial-state 
+        {:registers regs
+         :memory (make-cache-higherarchy 
+                  [[1 128] [2 512] [4 2048] [16 Long/MAX_VALUE]])}]
+    (doseq [[k v] memory]
+      (cache-write! (:memory initial-state) k v))
+
+    initial-state))
