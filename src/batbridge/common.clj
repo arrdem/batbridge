@@ -1,7 +1,7 @@
 (ns batbridge.common
   "Bits and pieces which were pulled out of various Batbridge
   simulators on the basis of constituting code repetition."
-  (:require [batbridge.cache :refer [make-cache-higherarchy cache-get!
+  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get!
                                      cache-write!]]))
 
 
@@ -29,7 +29,7 @@
   "Accesses an address in a processor state's memory, returning the
   value there. Defaults to 0, so the processor will halt if it jumps
   into unset instructions. Note that this function will behave badly
-  if there is not an installed cache higherarchy."
+  if there is not an installed cache hierarchy."
 
   [p addr]
   (cache-get! (:memory p) addr))
@@ -39,7 +39,7 @@
   "Writes the argument value into the processor state's memory,
   returning an updated processor state representation. Note that this
   function will behave badly if there is not an installed cache
-  higherarchy."
+  hierarchy."
 
   [p addr v]
   (cache-write! (:memory p) addr v))
@@ -83,14 +83,14 @@
 
 (defn make-processor
   "Builds a processor map by installing values in registers and the
-  memory higherarchy. This function transforms what has been the
+  memory hierarchy. This function transforms what has been the
   traditional inline notation for a processor to a fully fledged cache
-  higherarchy equiped structure." 
+  hierarchy equiped structure." 
 
   [{:keys [regs memory]}]
   (let [initial-state 
         {:registers regs
-         :memory (make-cache-higherarchy 
+         :memory (make-cache-hierarchy
                   [[1 128] [2 512] [4 2048] [16 Long/MAX_VALUE]])}]
     (doseq [[k v] memory]
       (cache-write! (:memory initial-state) k v))
