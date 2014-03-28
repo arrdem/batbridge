@@ -161,6 +161,5 @@
   [state]
   (loop [state state]
     (if-not (common/halted? state)
-      (do (println "-------------------------------------------------")
-          (recur (step state)))
+      (recur (step state))
       state)))
