@@ -95,12 +95,12 @@
 
 (defn update-taken
   [processor]
-  (update-history processor 1))
+  (update-history processor true))
 
 
 (defn update-not-taken
   [processor]
-  (update-history processor 0))
+  (update-history processor false))
 
 
 ;;------------------------------------------------------------------------------
