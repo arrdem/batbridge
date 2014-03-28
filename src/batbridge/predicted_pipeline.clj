@@ -159,7 +159,8 @@
                                   ;; the next PC value. This means to
                                   ;; jumping to PC+4 does exactly
                                   ;; nothing as it should.
-            (do (warn "[writeback] flushing pipeline!")
+            (do (warn "[writeback] Branch mispredict!")
+                (warn "[writeback] flushing pipeline!")
                 (-> processor
                     (update-taken)
                     (train-jump (- pc 4) val)
@@ -173,9 +174,10 @@
                (= 31 addr)
                (= val npc)) ;; In this case we need to reinforce the
                             ;; branch prediction.
-            (-> processor
-                (update-taken)
-                (train-jump (- pc 4) val))
+            (do  (info "[writeback] Branch predicted!")
+                 (-> processor
+                     (update-taken)
+                     (train-jump (- pc 4) val)))
 
           true
             (-> processor
