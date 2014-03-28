@@ -9,6 +9,7 @@
                        [bytecode  :as b]]
             [toothpick.assembler :refer [assemble]]
             [toothpick.isa.batbridge :refer [batbridge]]
+            [taoensso.timbre :as timbre]
             [clojure.test :as t]))
 
 
@@ -26,19 +27,20 @@
   checking."
 
   [test step bound]
-  (let [{:keys [opcodes predicate]} test
-        state (c/instrs->state opcodes)]
-    ;; (println "[]" opcodes)
-    ;; (println "[]" predicate)
-    ;; (println "[]" bound)
-    (t/is (predicate
-           (loop [state state
-                  bound bound]
-             (if (or (c/halted? state)
-                     (= bound 0))
-               state
-               (recur (step state)
-                      (dec bound))))))))
+  (timbre/with-log-level :warn
+    (let [{:keys [opcodes predicate]} test
+          state (c/instrs->state opcodes)]
+      ;; (println "[]" opcodes)
+      ;; (println "[]" predicate)
+      ;; (println "[]" bound)
+      (t/is (predicate
+             (loop [state state
+                    bound bound]
+               (if (or (c/halted? state)
+                       (= bound 0))
+                 state
+                 (recur (step state)
+                        (dec bound)))))))))
 
 
 ;; Test suite based on computing fibonacci numbers
