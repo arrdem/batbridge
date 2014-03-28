@@ -6,13 +6,14 @@
   (:require [batbridge [isa :as isa]
                        [common :as common]
                        [single-cycle :as ss]]
+            [taoensso.timbre :refer [info warn]]
             [clojure.set :as set]))
 
 
 ;; There is an extra issue in the pipelined processor, one which I
 ;; completely forgot about until misbehavior in my test suite exposed
 ;; it from its lurkings.
-;; 
+;;
 ;; When it takes nonzero time for the "previous" instruction to
 ;; register changes in memory or in registers, it is very possible
 ;; that if the "subsequent" instruction depends on the change to be
@@ -50,7 +51,7 @@
   returning the input state unmodified due to a pipeline stall."
 
   [processor]
-  (if (stalled? processor) 
+  (if (stalled? processor)
     processor
     (ss/fetch processor)))
 
@@ -61,7 +62,7 @@
   state unmodified due to a pipeline stall."
 
   [processor]
-  (if (stalled? processor) 
+  (if (stalled? processor)
     processor
     (let [next-processor (ss/decode processor)
           {:keys [decode execute]} next-processor
@@ -71,8 +72,8 @@
                               (into [(:a decode) (:b decode)])
                               (disj 30 29))
                           addr))
-        (do (println "[decode   ] stalling the pipeline!")
-            (-> processor 
+        (do (info "[decode   ] stalling the pipeline!")
+            (-> processor
                 (assoc :stall 1)
                 (dissoc :decode)))
         next-processor))))
@@ -82,16 +83,16 @@
   "Pulls a writeback directive out of the processor state, and
   performs the indicated update on the processor state. Update command
   have been restructured and are now maps
-  {:dst (U :registers :halt :memory) :addr Int :val Int}."  
+  {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
   (let [directive (get processor :execute [:registers 30 0])
-        {:keys [dst addr val]} directive]
-    (println "[writeback]" directive)
+        {:keys [dst addr val npc]} directive]
+    (info "[writeback]" directive)
     (cond ;; special case to stop the show
           (= :halt dst)
             (assoc processor :halted true)
-          
+
           ;; special case for hex code printing
           (and (= :registers dst)
                (= 29 addr))
@@ -105,11 +106,15 @@
             (do (when-not (zero? val)
                   (print (char val)))
                 processor)
-            
+
           ;; special case for branching as we must flush the pipeline
           (and (= :registers dst)
-               (= 31 addr))
-            (do (println "[writeback] flushing pipeline!")
+               (= 31 addr)
+               (not (= val npc))) ;; don't flush if we aren't changing
+                                  ;; the next PC value. This means to
+                                  ;; jumping to PC+4 does exactly
+                                  ;; nothing as it should.
+            (do (warn "[writeback] flushing pipeline!")
                 (-> processor
                     (dissoc :fetch)
                     (dissoc :decode)
@@ -124,9 +129,11 @@
   "A dec which deals with a nil argument case, and has a floor value
   of 0."
 
-  [nillable-value]
-  (let [v (or nillable-value 0)]
-    (max 0 (dec v))))
+  [processor]
+  (update-in processor [:stall]
+             (fn [nillable-value]
+               (let [v (or nillable-value 0)]
+                 (max 0 (dec v))))))
 
 
 (defn step
@@ -138,23 +145,21 @@
   storing the state between clock 'cycles'."
 
   [state]
-  (do (println "-------------------------------------------------")
-      (-> state
-          writeback
-          ss/execute
-          decode
-          fetch
-          (update-in [:stall] stall-dec))))
+  (-> state
+      writeback
+      ss/execute
+      decode
+      fetch
+      stall-dec))
 
 
 (defn -main
   "Steps a processor state until such time as it becomes marked as
   'halted'. Makes no attempt to construct or validate a processor
-  state, or handle errors therein." 
+  state, or handle errors therein."
 
   [state]
   (loop [state state]
     (if-not (common/halted? state)
-      (do (println "-------------------------------------------------")
-          (recur (step state)))
+      (recur (step state))
       state)))
