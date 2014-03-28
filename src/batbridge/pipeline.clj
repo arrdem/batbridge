@@ -128,9 +128,11 @@
   "A dec which deals with a nil argument case, and has a floor value
   of 0."
 
-  [nillable-value]
-  (let [v (or nillable-value 0)]
-    (max 0 (dec v))))
+  [processor]
+  (update-in processor [:stall]
+             (fn [nillable-value]
+               (let [v (or nillable-value 0)]
+                 (max 0 (dec v))))))
 
 
 (defn step
@@ -148,7 +150,7 @@
           ss/execute
           decode
           fetch
-          (update-in [:stall] stall-dec))))
+          stall-dec)))
 
 
 (defn -main
