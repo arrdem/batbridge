@@ -35,7 +35,8 @@
 
 
 (defn train-pred [p addr hst res]
-  (let [a [(bit-xor addr (vec->bitv hst))]]
+  (let [a [(bit-xor (bit-and 0x1FF addr)
+                    (vec->bitv hst))]]
     (case res
       (:taken)     (update-in p a two-bit-counter :inc)
       (:not-taken) (update-in p a two-bit-counter :dec))))
@@ -105,7 +106,7 @@
   [processor outcome]
   (update-in processor [:predictor :hst]
              (fn [hist]
-               (into (ring-buffer 63)
+               (into (ring-buffer 9)
                      (conj hist outcome)))))
 
 
