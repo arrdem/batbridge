@@ -20,7 +20,9 @@
     (println "[fetch    ]" pc "->" icode)
     (-> processor
         (assoc-in [:registers 31] npc)
-        (assoc :fetch {:icode icode :pc npc}))))
+        (assoc :fetch {:icode icode
+                       :npc   -1
+                       :pc    npc}))))
 
 
 (defn decode
@@ -29,7 +31,7 @@
   it'll be nice later."  
 
   [processor]
-  (let [{:keys [icode pc] :as fetch} 
+  (let [{:keys [icode pc npc] :as fetch} 
             (get processor :fetch {:icode isa/vec-no-op
                                    :pc    -1})]
     (println "[decode   ]" icode)
@@ -39,6 +41,7 @@
     (as-> icode v 
           (isa/decode-instr v)
           (assoc v :pc pc)
+          (assoc v :npc npc)
           (assoc processor :decode v))))
 
 
@@ -50,7 +53,7 @@
   processor state."
 
   [processor]
-  (let [{:keys [icode a b d i pc] :as decode}
+  (let [{:keys [icode a b d i pc npc] :as decode}
         (get processor :decode
              isa/map-no-op)
         srca  (common/register->val processor a pc i)
@@ -60,7 +63,8 @@
           (get isa/opcode->fn v)
           (v srca srcb processor d)
           (common/upgrade-writeback-command v)
-          (assoc v :pc (get-in processor [:decode :pc]))
+          (assoc v :pc pc)
+          (assoc v :npc npc)
           (assoc processor :execute v))))
 
 
@@ -95,12 +99,8 @@
           ;; special case for branching as we must flush the pipeline
           (and (= :registers dst)
                (= 31 addr))
-            (do (println "[writeback] flushing pipeline!")
-                (-> processor
-                    ;(dissoc :fetch)
-                    ;(dissoc :decode)
-                    ;(dissoc :execute) 
-                    (assoc-in [:registers addr] val)))
+            (-> processor
+                (assoc-in [:registers addr] val))
 
           true
             (assoc-in processor [dst addr] val))))
