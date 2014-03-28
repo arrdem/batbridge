@@ -86,7 +86,7 @@
 
   [processor]
   (let [directive (get processor :execute [:registers 30 0])
-        {:keys [dst addr val]} directive]
+        {:keys [dst addr val npc]} directive]
     (println "[writeback]" directive)
     (cond ;; special case to stop the show
           (= :halt dst)
@@ -108,7 +108,11 @@
             
           ;; special case for branching as we must flush the pipeline
           (and (= :registers dst)
-               (= 31 addr))
+               (= 31 addr)
+               (not (= val npc))) ;; don't flush if we aren't changing
+                                  ;; the next PC value. This means to
+                                  ;; jumping to PC+4 does exactly
+                                  ;; nothing as it should.
             (do (println "[writeback] flushing pipeline!")
                 (-> processor
                     (dissoc :fetch)
