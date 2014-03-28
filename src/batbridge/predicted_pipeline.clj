@@ -179,7 +179,6 @@
                 (-> processor
                     (update-taken)
                     (train-jump (- pc 4) val)
-                    (update-in [:flush] inc)
                     (dissoc :fetch)
                     (dissoc :decode)
                     (dissoc :execute)
