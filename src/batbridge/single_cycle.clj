@@ -4,7 +4,8 @@
   operation performance and to allow correctness comparison between multiple
   differing processor implementations."
   (:require [batbridge [common :as common]
-                       [isa :as isa]]))
+                       [isa :as isa]]
+            [taoensso.timbre :refer [info warn]]))
 
 
 (defn fetch 
@@ -17,7 +18,7 @@
   (let [pc (common/get-register processor 31)
         icode (common/get-memory processor pc)
         npc (+ pc 4)]
-    (println "[fetch    ]" pc "->" icode)
+    (info "[fetch    ]" pc "->" icode)
     (-> processor
         (assoc-in [:registers 31] npc)
         (assoc :fetch {:icode icode
@@ -34,8 +35,8 @@
   (let [{:keys [icode pc npc] :as fetch} 
             (get processor :fetch {:icode isa/vec-no-op
                                    :pc    -1})]
-    (println "[decode   ]" icode)
-    (println "[decode   ]" (-> icode
+    (info "[decode   ]" icode)
+    (info "[decode   ]" (-> icode
                                isa/decode-instr
                                common/fmt-instr))
     (as-> icode v 
@@ -58,7 +59,7 @@
              isa/map-no-op)
         srca  (common/register->val processor a pc i)
         srcb  (common/register->val processor b pc i)]
-    (println "[execute  ]" decode)
+    (info "[execute  ]" decode)
     (as-> icode v
           (get isa/opcode->fn v)
           (v srca srcb processor d)
@@ -77,7 +78,7 @@
   [processor]
   (let [directive (get processor :execute isa/writeback-no-op)
         {:keys [dst addr val]} directive]
-    (println "[writeback]" directive)
+    (info "[writeback]" directive)
     (cond ;; special case to stop the show
           (= :halt dst)
             (assoc processor :halted true)

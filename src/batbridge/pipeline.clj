@@ -6,6 +6,7 @@
   (:require [batbridge [isa :as isa]
                        [common :as common]
                        [single-cycle :as ss]]
+            [taoensso.timbre :refer [info warn]]
             [clojure.set :as set]))
 
 
@@ -71,7 +72,7 @@
                               (into [(:a decode) (:b decode)])
                               (disj 30 29))
                           addr))
-        (do (println "[decode   ] stalling the pipeline!")
+        (do (info "[decode   ] stalling the pipeline!")
             (-> processor 
                 (assoc :stall 1)
                 (dissoc :decode)))
@@ -87,7 +88,7 @@
   [processor]
   (let [directive (get processor :execute [:registers 30 0])
         {:keys [dst addr val npc]} directive]
-    (println "[writeback]" directive)
+    (info "[writeback]" directive)
     (cond ;; special case to stop the show
           (= :halt dst)
             (assoc processor :halted true)
@@ -113,7 +114,7 @@
                                   ;; the next PC value. This means to
                                   ;; jumping to PC+4 does exactly
                                   ;; nothing as it should.
-            (do (println "[writeback] flushing pipeline!")
+            (do (warn "[writeback] flushing pipeline!")
                 (-> processor
                     (dissoc :fetch)
                     (dissoc :decode)
@@ -144,13 +145,12 @@
   storing the state between clock 'cycles'."
 
   [state]
-  (do (println "-------------------------------------------------")
-      (-> state
-          writeback
-          ss/execute
-          decode
-          fetch
-          stall-dec)))
+  (-> state
+      writeback
+      ss/execute
+      decode
+      fetch
+      stall-dec))
 
 
 (defn -main

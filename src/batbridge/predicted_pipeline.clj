@@ -6,6 +6,7 @@
   (:require [batbridge [single-cycle :as ss]
                        [pipeline :as p]
                        [common :as common]]
+            [taoensso.timbre :refer [info warn]]
             [amalloy.ring-buffer 
              :refer [ring-buffer]]))
 
@@ -133,7 +134,7 @@
     (let [pc    (common/get-register processor 31)
           icode (common/get-memory processor pc)
           npc   (next-pc processor)]
-      (println "[fetch    ]" pc "->" icode " npc:" npc)
+      (info "[fetch    ]" pc "->" icode " npc:" npc)
       (-> processor
           (assoc-in [:registers 31] npc)
           (assoc :fetch {:icode icode 
@@ -150,7 +151,7 @@
   [processor]
   (let [directive (get processor :execute [:registers 30 0])
         {:keys [dst addr val pc npc]} directive]
-    (println "[writeback]" directive)
+    (info "[writeback]" directive)
     (cond ;; special case to stop the show
           (= :halt dst)
             (assoc processor :halted true)
@@ -176,7 +177,7 @@
                                   ;; the next PC value. This means to
                                   ;; jumping to PC+4 does exactly
                                   ;; nothing as it should.
-            (do (println "[writeback] flushing pipeline!")
+            (do (warn "[writeback] flushing pipeline!")
                 (-> processor
                     (update-taken)
                     (train-jump (- pc 4) val)
@@ -209,13 +210,12 @@
   storing the state between clock 'cycles'."
 
   [state]
-  (do (println "-------------------------------------------------")
-      (-> state
-          writeback
-          ss/execute
-          p/decode
-          fetch
-          p/stall-dec)))
+  (-> state
+      writeback
+      ss/execute
+      p/decode
+      fetch
+      p/stall-dec))
 
 
 (defn -main
