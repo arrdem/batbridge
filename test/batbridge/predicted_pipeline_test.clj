@@ -4,7 +4,7 @@
             [clojure.test :refer :all]))
 
 
-(def bound 100)
+(def bound 200)
 
 
 (deftest fib-test
