@@ -49,24 +49,6 @@
 ;; ------------------------------------------------------------------------------
 ;; [1] (http://www.hpl.hp.com/techreports/Compaq-DEC/WRL-TN-36.pdf)
 
-(defn taken?
-  "Examines a processor state, determining whether the state of the
-  Writeback stage qualifies under my definition of taken vs. not
-  taken."
-
-  [processor]
-  (let [{:keys [dst addr val pc]} (:execute processor)]
-    (cond (or (and (= dst :registers)
-                   (= addr 31)
-                   (= val pc))
-              (not (= addr 31)))
-            :not-taken
-
-          (and (= dst :registers)
-               (= addr 31))
-            :taken)))
-
-
 (defn next-pc
   "Examines a processor state, determining the next value for the
   PC. Note that this relies on support from writeback to record PC
@@ -113,12 +95,12 @@
 
 (defn update-taken
   [processor]
-  (update-history processor 1))
+  (update-history processor true))
 
 
 (defn update-not-taken
   [processor]
-  (update-history processor 0))
+  (update-history processor false))
 
 
 ;;------------------------------------------------------------------------------
