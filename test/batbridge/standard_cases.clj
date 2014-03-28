@@ -132,7 +132,7 @@
   ;; control flow used is essentially the same as that in fib-test.
   ;; This is essentially the same as (reduce * (range 1 11)).
 
-    (->> fact-icodes
+  (->> fact-icodes
        (assemble batbridge)
        (c/seq->instrs))
 
