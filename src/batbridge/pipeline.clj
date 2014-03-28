@@ -13,7 +13,7 @@
 ;; There is an extra issue in the pipelined processor, one which I
 ;; completely forgot about until misbehavior in my test suite exposed
 ;; it from its lurkings.
-;; 
+;;
 ;; When it takes nonzero time for the "previous" instruction to
 ;; register changes in memory or in registers, it is very possible
 ;; that if the "subsequent" instruction depends on the change to be
@@ -51,7 +51,7 @@
   returning the input state unmodified due to a pipeline stall."
 
   [processor]
-  (if (stalled? processor) 
+  (if (stalled? processor)
     processor
     (ss/fetch processor)))
 
@@ -62,7 +62,7 @@
   state unmodified due to a pipeline stall."
 
   [processor]
-  (if (stalled? processor) 
+  (if (stalled? processor)
     processor
     (let [next-processor (ss/decode processor)
           {:keys [decode execute]} next-processor
@@ -73,7 +73,7 @@
                               (disj 30 29))
                           addr))
         (do (info "[decode   ] stalling the pipeline!")
-            (-> processor 
+            (-> processor
                 (assoc :stall 1)
                 (dissoc :decode)))
         next-processor))))
@@ -83,7 +83,7 @@
   "Pulls a writeback directive out of the processor state, and
   performs the indicated update on the processor state. Update command
   have been restructured and are now maps
-  {:dst (U :registers :halt :memory) :addr Int :val Int}."  
+  {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
   (let [directive (get processor :execute [:registers 30 0])
@@ -92,7 +92,7 @@
     (cond ;; special case to stop the show
           (= :halt dst)
             (assoc processor :halted true)
-          
+
           ;; special case for hex code printing
           (and (= :registers dst)
                (= 29 addr))
@@ -106,7 +106,7 @@
             (do (when-not (zero? val)
                   (print (char val)))
                 processor)
-            
+
           ;; special case for branching as we must flush the pipeline
           (and (= :registers dst)
                (= 31 addr)
@@ -156,7 +156,7 @@
 (defn -main
   "Steps a processor state until such time as it becomes marked as
   'halted'. Makes no attempt to construct or validate a processor
-  state, or handle errors therein." 
+  state, or handle errors therein."
 
   [state]
   (loop [state state]
