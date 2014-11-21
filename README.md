@@ -8,10 +8,10 @@ posts aim to demonstrate basic processor design models, as well as
 
 [The full Batbridge specification](doc/batbridge.md)
 
- 1. [A single cycle processor](http://arrdem.com/2013/11/03/a-single-cycle-processor.html)
- 2. [Cache accelerated machines](http://www.arrdem.com/2014/01/04/a-cache-higherarchy.html)
- 3. [A pipelined processor](http://www.arrdem.com/2014/01/05/a-pipeline-machine.html)
- 4. [Branch prediction in a pipeline](http://www.arrdem.com/2014/01/06/a-branch-predicted-machine.html)
+ 1. [A single cycle processor](http://arrdem.com/2013/11/03/a-single-cycle-processor/)
+ 2. [Cache accelerated machines](http://arrdem.com/2014/01/04/a-cache-higherarchy/)
+ 3. [A pipelined processor](http://arrdem.com/2014/01/05/a-pipeline-machine/)
+ 4. [Branch prediction in a pipeline](http://arrdem.com/2014/01/06/a-branch-predicted-machine/)
  5. [An out of order processor]() [TODO]
 
 All materials copyright © 2013 Reid "arrdem" McKenzie
