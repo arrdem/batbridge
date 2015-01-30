@@ -124,15 +124,15 @@
   "Pulls appart a vector instruction, building the symbolic assembler
   map which the Clojure simulators are designed to work with."
   [vec-instr]
-  (let [[op d a b i] vec-instr]
-    (doseq [i [op d a b i]]
-      (assert (not (nil? i))
-              (format "Vector decoding failed, nil parameter!")))
-    {:icode op
-     :d     d
-     :a     a
-     :b     b
-     :i     i}))
+  (case (first vec-instr)
+    (:ifeq :ifle :iflt :ifne)
+    ,,(zipmap [:icode :a :b :i] vec-instr)
+    
+    (:hlt)
+    ,,(zipmap [:icode] vec-instr)
+
+    ;; else
+    ,,(zipmap [:icode :d :a :b :i] vec-instr)))
 
 
 (defn normalize-icode

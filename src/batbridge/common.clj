@@ -78,7 +78,15 @@
   in debugging / inspecting decoded word instructions."
 
   [{:keys [icode d a b i] :as  map-instr}]
-  [icode d a b i])
+  (case icode
+    (:ifeq :ifle :iflt :ifne)
+    ,,[icode a b i]
+    
+    (:hlt)
+    ,,[icode]
+
+    ;; else
+    ,,[icode d a b i]))
 
 
 (defn make-processor
