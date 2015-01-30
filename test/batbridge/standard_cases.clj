@@ -12,13 +12,10 @@
             [taoensso.timbre :as timbre]
             [clojure.test :as t]))
 
-
 (defrecord ps-test [opcodes predicate])
-
 
 (defmacro deftest [sym opcodes predicate]
   `(def ~sym (->ps-test ~opcodes ~predicate)))
-
 
 (defn run-test
   "Destructures and runs a given test record using the specified step
@@ -42,7 +39,6 @@
                  (recur (step state)
                         (dec bound)))))))))
 
-
 ;; Test suite based on computing fibonacci numbers
 ;;------------------------------------------------------------------------------
 (def fib-icodes
@@ -56,9 +52,9 @@
    [:add  0  1  30 0 ] ;; move fib(n-1) down
    [:add  1  2  30 0 ] ;; move fib(n) down
    [:sub  3  3  29 1 ] ;; dec the loop constant
-   [:ifne 0  3  30 0 ] ;; test if we've zeroed the loop counter yet
+   [:ifne    3  30 0 ] ;; test if we've zeroed the loop counter yet
    [:add  31 30 29 12] ;; if not jump to the top of the loop
-   [:hlt  0  0  0  0 ] ;; otherwise halt
+   [:hlt             ] ;; otherwise halt
    ])
 
 (deftest fib-test
@@ -98,8 +94,8 @@
                  (map i/decode-instr)
                  (map c/fmt-instr)
                  (map vector fib-icodes))]
-    (t/is (= (first p) (second p)))))
-
+    (t/is (= (first p)
+             (second p)))))
 
 ;; Test suite based on computing factorials
 ;;------------------------------------------------------------------------------
@@ -111,9 +107,9 @@
                        ;; write the fact loop
    [:mul  0  0  1  0 ] ;; Multiply fact(n-1) and n
    [:sub  1  1  29 1 ] ;; dec the loop constant
-   [:ifne 0  1  30 0 ] ;; test if we've zeroed the loop counter yet
+   [:ifne    1  30 0 ] ;; test if we've zeroed the loop counter yet
    [:add  31 30 29 8 ] ;; if not jump to the top of the loop
-   [:hlt  0  0  0  0 ] ;; otherwise halt
+   [:hlt             ] ;; otherwise halt
    ])
 
 (deftest fact-test
