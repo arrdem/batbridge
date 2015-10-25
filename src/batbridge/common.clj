@@ -4,7 +4,6 @@
   (:require [batbridge.cache :refer [make-cache-hierarchy cache-get!
                                      cache-write!]]))
 
-
 (defn register? 
   "Predicate to test whether or not the argument integer is a valid
   register identifier."
@@ -14,14 +13,12 @@
        (< x 32)
        (>= x 0)))
 
-
 (defn halted? 
   "Common predicate for testing whether a processor state has become
   halted or not yet."
 
   [state]
   (or (:halted state) false))
-
 
 ;; Various processor components refactored out due to commonality
 ;;------------------------------------------------------------------------------
@@ -34,7 +31,6 @@
   [p addr]
   (cache-get! (:memory p) addr))
 
-
 (defn write-memory
   "Writes the argument value into the processor state's memory,
   returning an updated processor state representation. Note that this
@@ -42,16 +38,17 @@
   hierarchy."
 
   [p addr v]
-  (cache-write! (:memory p) addr v))
-
+  ;; cache-write is side-effectful so first we do it
+  (cache-write! (:memory p) addr v)
+  ;; then we return the processor we had
+  p)
 
 (defn get-register
   "Fetches a register value by register ID from a processor state,
   returning the value."
 
   [p reg]
-  (get-in p [:registers reg] 0))     
-
+  (get-in p [:registers reg] 0))    
 
 (defn register->val
   "Helper function to compute a value from either a keyword register
@@ -64,14 +61,12 @@
     (:r_IMM  29) imm
     (get-register processor reg)))
 
-
 (defn upgrade-writeback-command
   "Transforms an old vector writeback command into the new map
   structure, thus allowing for pc data to be preserved."
   
   [[dst addr v]]
   {:dst dst :addr addr :val v})
-
 
 (defn fmt-instr
   "Formats a map instruction as a vector instruction. Intended for use
@@ -87,7 +82,6 @@
 
     ;; else
     ,,[icode d a b i]))
-
 
 (defn make-processor
   "Builds a processor map by installing values in registers and the
@@ -105,7 +99,6 @@
 
     initial-state))
 
-
 (defn seq->instrs
   "Translates a sequence of _vector_ instructions to a map of word IDs
    to instructions. Note that this _cannot_ be used for a bytecode
@@ -116,7 +109,6 @@
   [seq] 
   (zipmap (range 0 (* 4 (count seq)) 4) 
           seq))
-
 
 (defn instrs->state 
   "Generates the minimum of a processor state required to invoke
