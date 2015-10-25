@@ -53,11 +53,14 @@
   generic with respect to processor state, and can therefor be re-used
   by all processors."
 
-  {:hlt  (fn [_ _ _ _  ] [:halt nil nil])
+  {:hlt  (fn [_ _ _ _  ]
+           [:halt nil nil])
+
    :ld   (fn [x y p dst]
            (let [a (+ x (* 4 y))
                  v (get-memory p a)]
              [:registers dst v]))
+
    :st   (fn [x y p dst]
            (let [v   (get-register p dst)
                  dst (+ x (* 4 y))]
