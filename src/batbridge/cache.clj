@@ -12,7 +12,8 @@
 ;;    :else    (U <cache> <None>)
 ;;   }
 
-(defn ninc [x] (if x (inc x) 1))
+(defn ninc [x]
+  (if x (inc x) 1))
 
 (defn cache-hit!
   "Executes the cache metadata side-effects associated with hitting in
@@ -23,7 +24,6 @@
   [cache key]
   (-> (:map cache)
       (swap! update-in [:meta key] ninc)))
-
 
 (defn cache-evict!
   "Executes the cache metadata side-effects associated with missing an
@@ -44,7 +44,6 @@
       (do (swap! atom update-in [:store] dissoc victim)
           (swap! atom update-in [:meta]  dissoc victim)))))
 
-
 (defn cache-install!
   "Installs a key/value pair in a cache, performing the appropriate
   side-effects. This function is entirely for side-effects and returns
@@ -53,7 +52,6 @@
   (swap! (:map cache) update-in [:store] assoc key v)
   (swap! (:map cache) update-in [:meta]  assoc key 1))
 
-
 (defn cache-get!
   "Recursively fetches a value from nested caches, incuring access
    latency as it scans the nested caches."
@@ -61,18 +59,18 @@
   [cache key]
   (Thread/sleep (get cache :latency 0)) ;; incur read latency
   (if (contains? (:store @(:map cache)) key)
-      ;; cache hit case
-      ;;-------------------------------------------------
-      (do (cache-hit! cache key)
-          (get (:store @(:map cache)) key))
+    ;; cache hit case
+    ;;-------------------------------------------------
+    (do (cache-hit! cache key)
+        (get (:store @(:map cache)) key))
 
-      ;; cache miss case
-      ;;-------------------------------------------------
-      (let [v (if (:else cache)
-                (cache-get! (:else cache) key)
-                0)]
-        (cache-install! cache key v)
-        v)))
+    ;; cache miss case
+    ;;-------------------------------------------------
+    (let [v (if (:else cache)
+              (cache-get! (:else cache) key)
+              0)]
+      (cache-install! cache key v)
+      v)))
 
 (defn cache-write!
   "Writing to the cache sucks. However for now it doesn't suck too
@@ -87,7 +85,6 @@
       (swap! update-in [:store] assoc key v))
   (when (:else cache)
     (cache-write! (:else cache) key v)))
-
 
 (defn make-cache-hierarchy 
   "Builds a cache hierarchy from a pairs [latency, size]. The result

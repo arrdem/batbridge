@@ -4,8 +4,11 @@
   structures were refactored out of several different simulators in
   the interests of making spec compliance easiser to maintain."
 
-  (:require [batbridge [bytecode :refer [word->symbol-map]]
-                       [common   :refer [get-register get-memory]]]))
+  (:require [batbridge
+             ,,[bytecode
+                :refer [word->symbol-map]]
+             ,,[common
+                :refer [get-register get-memory]]]))
 
 
 ;; No-op constants for the various stages
