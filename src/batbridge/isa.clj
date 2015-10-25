@@ -54,8 +54,14 @@
   by all processors."
 
   {:hlt  (fn [_ _ _ _  ] [:halt nil nil])
-   :ld   (fn [x y p dst] [:registers dst (get-memory p (+ x (* 4 y)))])
-   :st   (fn [x y p dst] [:memory (+ x (* 4 y)) (get-register p dst)])
+   :ld   (fn [x y p dst]
+           (let [a (+ x (* 4 y))
+                 v (get-memory p a)]
+             [:registers dst v]))
+   :st   (fn [x y p dst]
+           (let [v   (get-register p dst)
+                 dst (+ x (* 4 y))]
+             [:memory dst v]))
 
    :iflt (fn [x y p dst]
            (let [pc (get-register p 31)]
