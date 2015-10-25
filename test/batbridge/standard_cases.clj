@@ -2,15 +2,19 @@
   "Defines a series of standard test cases for processors, being an
   input memory and a final register state with a bound on the number
   of cycles to run."
-
-  (:require [batbridge [assembler :as a]
-                       [common    :as c]
-                       [isa       :as i]
-                       [bytecode  :as b]]
-            [toothpick.assembler :refer [assemble]]
-            [toothpick.isa.batbridge :refer [batbridge]]
-            [taoensso.timbre :as timbre]
-            [clojure.test :as t]))
+  (:require [batbridge
+             ,,[assembler :as a]
+             ,,[common :as c]
+             ,,[isa :as i]
+             ,,[bytecode :as b]]
+            [toothpick.assembler
+             :refer [assemble]]
+            [toothpick.isa.batbridge
+             :refer [batbridge]]
+            [taoensso.timbre
+             :as timbre]
+            [clojure.test
+             :as t]))
 
 (defrecord ps-test [opcodes predicate])
 
@@ -26,7 +30,7 @@
   [test step bound]
   (timbre/with-log-level :warn
     (let [{:keys [opcodes predicate]} test
-          state (c/instrs->state opcodes)]
+          state                       (c/instrs->state opcodes)]
       ;; (println "[]" opcodes)
       ;; (println "[]" predicate)
       ;; (println "[]" bound)
