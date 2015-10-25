@@ -16,3 +16,6 @@
   ;; runs the factorial test on the single cycle machine
   (sc/run-test sc/fact-test ss/step bound)
   (sc/run-test sc/fact-byte-test ss/step bound))
+
+(deftest memory-fact-test
+  (sc/run-test sc/memory-fact-test ss/step bound))

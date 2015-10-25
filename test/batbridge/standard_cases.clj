@@ -150,3 +150,42 @@
                  (map c/fmt-instr)
                  (map vector fact-icodes))]
     (t/is (= (first p) (second p)))))
+
+;; Test to make sure that ld/st works
+;;--------------------------------------------------------------------------------
+;; A modified factorial program which goes to memory every single time
+
+;; r0, the base pointer, 0x100
+;; r1, the offset pointer, 0x0 and incrementing
+;; r2, the previous value as loaded from mem
+
+(def ld-st-icodes
+  [[:add  0  30  29 (- 0x100 4)]
+   [:add  1  30  29 1 ]
+   [:st   1  0   1  0 ] ;; write r0 -> base + offset
+
+   ;; write the fact loop
+   [:ld   2  0  1  0   ] ;; load r0+r1*4 -> r2
+   [:mul  3  1  2  0   ] ;; Multiply fact(n-1) and n
+   [:add  1  1  29 1   ] ;; increment the memory offset
+   [:st   3  0  1  0   ] ;; store r3 -> r0+r1*4 where it will be read from into r2 next trip
+   [:ifne    1  29 12  ] ;; test if we've zeroed the loop counter yet
+   [:add  31 30 29 12  ] ;; if not jump to the top of the loop
+
+   [:hlt               ] ;; otherwise halt
+   ])
+
+(defn- fact [i]
+  (if (zero? i) 1
+      (apply * (range 1 (inc i)))))
+
+(deftest memory-fact-test
+  (->> ld-st-icodes
+       (assemble batbridge)
+       (c/seq->instrs))
+
+  (fn [state]
+    (dotimes [i 10]
+      (t/is (= (c/get-memory state (+ 256 (* 4 i)))
+               (fact i))))
+    true))
