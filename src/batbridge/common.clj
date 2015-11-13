@@ -43,23 +43,43 @@
   ;; then we return the processor we had
   p)
 
-(defn get-register
+(defn ^:private normalize-register [name]
+  (case name
+    (:r_PC)   31
+    (:r_ZERO) 30
+    (:r_IMM)  29
+    name))
+
+(defn ^:private get-register
   "Fetches a register value by register ID from a processor state,
-  returning the value."
+  returning the value.
+
+  UNLESS YOU REALLY KNOW WHAT YOU'RE DOING DON'T USE
+  THIS. register->val should be preferred."
 
   [p reg]
-  (get-in p [:registers reg] 0))    
+  (let [reg (normalize-register reg)]
+    (case reg
+      (30) 0
+      (get-in p [:registers reg] 0))))
 
 (defn register->val
   "Helper function to compute a value from either a keyword register
   alias or an integer register identifier. Returnes the value of
   accessing the identified register."
-  [processor reg pc imm]
-  (case reg
-    (:r_PC   31) pc
-    (:r_ZERO 30) 0
-    (:r_IMM  29) imm
-    (get-register processor reg)))
+  ([p r]
+   ;; This case works fine unless you're trying to read from the immediate
+   ;; register, in which case the caller fucked up and needs to provide that
+   ;; value.
+   {:pre [(not (#{:r_IMM 29} r))]}
+   (get-register p r))
+
+  ([processor reg pc imm]
+   (case reg
+     (:r_PC 31)   pc
+     (:r_ZERO 30) 0
+     (:r_IMM  29) imm
+     (get-register processor reg))))
 
 (defn upgrade-writeback-command
   "Transforms an old vector writeback command into the new map

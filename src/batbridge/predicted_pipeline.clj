@@ -56,7 +56,7 @@
 
   [processor]
   (let [{:keys [jump-map pred hst]} (:predictor processor)
-        pc                          (common/get-register processor 31)]
+        pc                          (common/register->val processor 31)]
     (if (and (contains? jump-map pc)
              (predict-pred pred pc hst))
       (get jump-map pc)
@@ -77,7 +77,7 @@
 (defn train-step
   [processor]
   (let [{:keys [hst]} (:predictor processor)
-        this          (common/get-register processor 31)]
+        this          (common/register->val processor 31)]
     (-> processor
         (update-in [:predictor :pred] train-pred this hst :not-taken))))
 
@@ -113,7 +113,7 @@
   [processor]
   (if (p/stalled? processor)
     processor
-    (let [pc    (common/get-register processor 31)
+    (let [pc    (common/register->val processor 31)
           icode (common/get-memory processor pc)
           npc   (next-pc processor)]
       (info "[fetch    ]" pc "->" icode " npc:" npc)

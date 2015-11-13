@@ -71,7 +71,7 @@
   (c/seq->instrs fib-icodes)
 
   (fn [state]
-    (t/is (= (c/get-register state 2)  ;; fib 15 with th (0,1) as the base case
+    (t/is (= (c/register->val state 2)  ;; fib 15 with th (0,1) as the base case
              610))
     (t/is (c/halted? state))           ;; the processor should have halted correctly
     true))
@@ -84,7 +84,7 @@
        (c/seq->instrs))
   
   (fn [state]
-    (t/is (= (c/get-register state 2)  ;; fib 15 with th (0,1) as the base case
+    (t/is (= (c/register->val state 2)  ;; fib 15 with th (0,1) as the base case
              610))
     (t/is (c/halted? state))           ;; the processor should have halted correctly
     true))
@@ -124,7 +124,7 @@
   (c/seq->instrs fact-icodes)
 
   (fn [state]
-    (t/is (= (c/get-register state 0)
+    (t/is (= (c/register->val state 0)
              3628800))                ;; fact(10)
     (t/is (c/halted? state))          ;; the processor should have halted correctly
     true))
@@ -139,7 +139,7 @@
        (c/seq->instrs))
 
   (fn [state]
-    (t/is (= (c/get-register state 0)
+    (t/is (= (c/register->val state 0)
              3628800))                ;; fact(10)
     (t/is (c/halted? state))          ;; the processor should have halted correctly
     true))

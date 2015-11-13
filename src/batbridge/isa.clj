@@ -8,7 +8,7 @@
              ,,[bytecode
                 :refer [word->symbol-map]]
              ,,[common
-                :refer [get-register get-memory]]]))
+                :refer [register->val get-memory]]]))
 
 
 ;; No-op constants for the various stages
@@ -62,20 +62,20 @@
              [:registers dst v]))
 
    :st   (fn [x y p dst]
-           (let [v   (get-register p dst)
+           (let [v   (register->val p dst)
                  dst (+ x (* 4 y))]
              [:memory dst v]))
 
    :iflt (fn [x y p dst]
-           (let [pc (get-register p 31)]
+           (let [pc (register->val p 31)]
              [:registers 31 (if (< x y) pc (+ pc 4))]))
 
    :ifle (fn [x y p dst]
-           (let [pc (get-register p 31)]
+           (let [pc (register->val p 31)]
              [:registers 31 (if (<= x y) pc (+ pc 4))]))
 
    :ifeq (fn [x y p dst]
-           (let [pc (get-register p 31)]
+           (let [pc (register->val p 31)]
              [:registers 31 (if (= x y) pc (+ pc 4))]))
 
    :ifne (fn [x y p dst]

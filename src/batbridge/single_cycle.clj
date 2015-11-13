@@ -16,7 +16,7 @@
   updated state."
 
   [processor]
-  (let [pc    (common/get-register processor 31)
+  (let [pc    (common/register->val processor 31)
         icode (common/get-memory processor pc)
         npc   (+ pc 4)]
     (info "[fetch    ]" pc "->" icode)
