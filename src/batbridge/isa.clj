@@ -53,46 +53,63 @@
   generic with respect to processor state, and can therefor be re-used
   by all processors."
 
-  {:hlt  (fn [_ _ _ _  ]
+  {:hlt  (fn [p pc i x y dst]
            [:halt nil nil])
 
-   :ld   (fn [x y p dst]
+   :ld   (fn [p pc i x y dst]
            (let [a (+ x (* 4 y))
                  v (get-memory p a)]
              [:registers dst v]))
 
-   :st   (fn [x y p dst]
-           (let [v   (register->val p dst)
+   :st   (fn [p pc i x y dst]
+           (let [v   (register->val p dst pc i)
                  dst (+ x (* 4 y))]
              [:memory dst v]))
 
-   :iflt (fn [x y p dst]
-           (let [pc (register->val p 31)]
-             [:registers 31 (if (< x y) pc (+ pc 4))]))
+   :iflt (fn [p pc i x y dst]
+           [:registers 31 (if (< x y) pc (+ pc 4))])
 
-   :ifle (fn [x y p dst]
-           (let [pc (register->val p 31)]
-             [:registers 31 (if (<= x y) pc (+ pc 4))]))
+   :ifle (fn [p pc i x y dst]
+           [:registers 31 (if (<= x y) pc (+ pc 4))])
 
-   :ifeq (fn [x y p dst]
-           (let [pc (register->val p 31)]
-             [:registers 31 (if (= x y) pc (+ pc 4))]))
+   :ifeq (fn [p pc i x y dst]
+           [:registers 31 (if (= x y) pc (+ pc 4))])
 
-   :ifne (fn [x y p dst]
-           (let [pc (get-in p [:decode :pc])]
-             [:registers 31 (if-not (= x y) pc (+ pc 4))]))
+   :ifne (fn [p pc i x y dst]
+           [:registers 31 (if-not (= x y) pc (+ pc 4))])
 
-   :add  (fn [x y _ dst] [:registers dst (+ x y)])
-   :sub  (fn [x y _ dst] [:registers dst (- x y)])
-   :div  (fn [x y _ dst] [:registers dst (/ x y)])
-   :mod  (fn [x y _ dst] [:registers dst (mod x y)])
-   :mul  (fn [x y _ dst] [:registers dst (* x y)])
-   :and  (fn [x y _ dst] [:registers dst (bit-and x y)])
-   :or   (fn [x y _ dst] [:registers dst (bit-or x y)])
-   :nand (fn [x y _ dst] [:registers dst (bit-not (bit-and x y))])
-   :xor  (fn [x y _ dst] [:registers dst (bit-xor x y)])
-   :sl   (fn [x y _ dst] [:registers dst (bit-shift-left x y)])
-   :sr   (fn [x y _ dst] [:registers dst (bit-shift-right x y)])})
+   :add  (fn [p pc i x y dst]
+           [:registers dst (+ x y)])
+   
+   :sub  (fn [p pc i x y dst]
+           [:registers dst (- x y)])
+   
+   :div  (fn [p pc i x y dst]
+           [:registers dst (/ x y)])
+   
+   :mod  (fn [p pc i x y dst]
+           [:registers dst (mod x y)])
+   
+   :mul  (fn [p pc i x y dst]
+           [:registers dst (* x y)])
+   
+   :and  (fn [p pc i x y dst]
+           [:registers dst (bit-and x y)])
+   
+   :or   (fn [p pc i x y dst]
+           [:registers dst (bit-or x y)])
+   
+   :nand (fn [p pc i x y dst]
+           [:registers dst (bit-not (bit-and x y))])
+   
+   :xor  (fn [p pc i x y dst]
+           [:registers dst (bit-xor x y)])
+   
+   :sl   (fn [p pc i x y dst]
+           [:registers dst (bit-shift-left x y)])
+   
+   :sr   (fn [p pc i x y dst]
+           [:registers dst (bit-shift-right x y)])})
 
 
 (def bytecode->opcode
