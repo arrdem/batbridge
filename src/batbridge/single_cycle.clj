@@ -65,7 +65,7 @@
     (info "[execute  ]" decode)
     (as-> icode v
       (get isa/opcode->fn v)
-      (v srca srcb processor d)
+      (v processor pc i srca srcb d)
       (common/upgrade-writeback-command v)
       (assoc v :pc pc)
       (assoc v :npc npc)
