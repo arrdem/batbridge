@@ -57,13 +57,17 @@
            [:halt nil nil])
 
    :ld   (fn [p pc i x y dst]
-           (let [a (+ x (* 4 y))
+           (let [a (bit-and
+                    (+ x (* 4 y))
+                    (bit-not 3))
                  v (get-memory p a)]
              [:registers dst v]))
 
    :st   (fn [p pc i x y dst]
            (let [v   (register->val p dst pc i)
-                 dst (+ x (* 4 y))]
+                 dst (bit-and
+                      (+ x (* 4 y))
+                      (bit-not 3))]
              [:memory dst v]))
 
    :iflt (fn [p pc i x y dst]
