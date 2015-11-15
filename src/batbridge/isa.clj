@@ -45,6 +45,9 @@
 
   {:dst :registers :addr 30 :val 0 :pc -1})
 
+(defn- word-round-down
+  "Rounds x to the nearest multiple of 4 preserving sign in the direction of 0"
+  [x] (bit-and x (bit-not 3)))
 
 ;; The  common opcode implementation map
 ;;------------------------------------------------------------------------------
@@ -57,17 +60,13 @@
            [:halt nil nil])
 
    :ld   (fn [p pc i x y dst]
-           (let [a (bit-and
-                    (+ x (* 4 y))
-                    (bit-not 3))
+           (let [a (word-round-down (+ x (* 4 y)))
                  v (get-memory p a)]
              [:registers dst v]))
 
    :st   (fn [p pc i x y dst]
            (let [v   (register->val p dst pc i)
-                 dst (bit-and
-                      (+ x (* 4 y))
-                      (bit-not 3))]
+                 dst (word-round-down (+ x (* 4 y)))]
              [:memory dst v]))
 
    :iflt (fn [p pc i x y dst]
