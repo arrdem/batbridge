@@ -85,16 +85,17 @@ Opcode 0x10
 010000 ttttt aaaaa xxxxx iiiiiiiiiii
 ```
 
-Loads the word `(+ a (* 4 x))` to `t`.
+Loads the word `(+ a (* 4 x))` to `t`. Load addresses are rounded down
+to the nearest multiple of 4.
 
-### ST
-Opcode 0x11
+### ST Opcode 0x11
 
 ```
 010001 sssss aaaaa xxxxx iiiiiiiiiii
 ```
 
-Stores the word in register `s` to the address `(+ a (* 4 x))`.
+Stores the word in register `s` to the address `(+ a (* 4 x))`. Store
+addresses are rounded down to the nearest multiple of 4.
 
 ### IFLT
 Opcode 0x20
