@@ -1,15 +1,19 @@
 # The Batbridge ISA specification
 
-The Batbridge machine standard was designed to be a simple RISC-like
-instruction set used in
-[Ahmed Gheith's CS375H](http://www.cs.utexas.edu/~gheith/). The
-Batbridge architecture is a 32 bit instruction encoding, the first six
-bits of which represent an opcode, the next three five bit hunks are
-opcode register parameters and the last eleven bits of which is an
-inline literal. The Batbridge machine features 32 registers, numbered
-[0,31], of which the following are special.
+The Batbridge machine standard was designed to be a simple 32 bit, word
+addressed RISC-like instruction set used in the first semester of UT Austin's CS
+Computer Architecture course by
+[Ahmed Gheith's CS375H](http://www.cs.utexas.edu/~gheith/).
 
-The PC, register #31 (0b11111)
+## BB32v0
+
+This is the original, unextended Batbridge ISA as I wrote it up and as Gheith
+assigned it to us to implement.
+
+The machine features 32 registers, numbered `[0 ... 31]`, of which the following
+are special.
+
+The PC, register 31 (0b11111)
   - Reading it produces the PC of the next instruction
   - Writing to the PC causes a branch, along with any other required
     system wide side effects for proper branching.
@@ -26,90 +30,221 @@ The immediate value, register #29 (0b1101)
   - On simulators, writing to the immediate value prints the written
     value on the console as a hex string.
 
-## Encoding specification notes
+Most instructions are formatted as follows, although the exact interpretation of
+these bit slices depends on the particular instruction.
+
+```c
+struct opcode {
+  uint32_t opcode:6;
+  uint32_t d:5;
+  uint32_t a:5;
+  uint32_t b:5;
+  int      i:11;
+}
 ```
- t : Target register. The sequence "ttttt" means the bit ID of the
-     target register, the metavariable t in the opcode description is
-     taken to mean the target register itself
+
+The above format is interpreted for each instruction given the following shorthand
+
+```
+ t : Target register
  s : Source register
  a : Register representing left operand
  b : Register representing right operand
  x : Register representing index (multiplied by operand size)
  i : Immediate signed quantity
  _ : Value is not read. Set to 0 when assembled by convention.
-
-Opcodes are encoded as length 32 bit vectors. By convention the
-rightmost character in the bit field specification is the 1st bit, and
-the leftmost character is the 32nd bit. Note that this makes the
-literal field the lowest order parameter and the opcode the highest
-order parameter.
-
-So for the HLT instruction, having the opcode 0x0 as defined below the
-literal 0b00000000000000000000000000000000 would be a correct encoding
-of the halt instruction. For add, being opcode 0x30 again as defined
-below the encoding 0b11000000000000000000000000000000 would correctly
-place the opcode and zero all the other fields.
 ```
 
-## Instruction set
+So the sequence "ttttt" means the bit ID of the target register, and the
+corresponding metavariable t in the opcode description is taken to mean the
+value of the named register. If the named register is `29` as above, then the
+value of the immediate field _in that instruction_ is used.
+
+The top bit of an instruction is set IFF the instruction does not go to
+memory. The second highest bit indicates that instruction is not a conditional
+control instruction. The remaining 4 bits have no particular meaning and for the
+most part were sequentially assigned.
+
+Note that, by having register 31 as its destination, any opcode which produces a
+result may cause a branch and so the criteria of checking the top bit is not
+sufficient.
+
+### HLT
+Opcode 0x00
+
 ```
-HLT  0x00 000000 _____ _____ _____ ___________
-     halts the machine immediately
-
-LD   0x10 010000 ttttt aaaaa xxxxx iiiiiiiiiii
-     loads the word a + 4 * x to t
-
-ST   0x11 010001 sssss aaaaa xxxxx iiiiiiiiiii
-     stores the word in register s to the address a + 4 * x
-
-IFLT 0x20 100000 _____ aaaaa bbbbb iiiiiiiiiii
-     execute the next instruction IFF a < b
- 
-IFLE 0x21 100001 _____ aaaaa bbbbb iiiiiiiiiii
-     execute the next instruction IFF a <= b
- 
-IFEQ 0x22 100010 _____ aaaaa bbbbb iiiiiiiiiii
-     execute the next instruction IFF a == b
- 
-IFNE 0x23 100013 _____ aaaaa bbbbb iiiiiiiiiii
-     execute the next instruction IFF a != b
- 
-ADD  0x30 110000 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores a + b to t
- 
-SUB  0x31 110001 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores a - b to t
- 
-DIV  0x32 110010 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the integer division of a / b to t
- 
-MOD  0x33 110011 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the integer remainder a / b to t
- 
-MUL  0x34 110100 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the product a * b to t
- 
-AND  0x35 110101 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores a & b (bitwise and) to t
- 
-OR   0x36 110110 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores a | b (bitwise or) to t
-
-NAND 0x37 110111 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the bitwise nand of a and b to t
- 
-XOR  0x38 111000 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the xor of a and b to t
- 
-SL   0x3a 111010 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the left shift of a by b bits to t
-
-SR   0x3b 111011 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the right shift of a by b bits to t
- 
-SAL  0x3c 111100 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the arithmatic shift left of a b bits to t
-
-SAR  0x3d 111101 ttttt aaaaa bbbbb iiiiiiiiiii
-     stores the arithmatic right shift of a by b bits to t
+000000 _____ _____ _____ ___________
 ```
+
+Halts the machine immediately.
+
+### LD
+Opcode 0x10
+
+```
+010000 ttttt aaaaa xxxxx iiiiiiiiiii
+```
+
+Loads the word `(+ a (* 4 x))` to `t`.
+
+### ST
+Opcode 0x11
+
+```
+010001 sssss aaaaa xxxxx iiiiiiiiiii
+```
+
+Stores the word in register `s` to the address `(+ a (* 4 x))`.
+
+### IFLT
+Opcode 0x20
+```
+100000 _____ aaaaa bbbbb iiiiiiiiiii
+```
+
+Executes the next instruction IFF `(< a b)`.
+ 
+### IFLE
+Opcode 0x21
+
+```
+100001 _____ aaaaa bbbbb iiiiiiiiiii
+```
+Execute the next instruction IFF `(<= a  b)`.
+
+## IFEQ
+Opcode 0x22
+
+```
+100010 _____ aaaaa bbbbb iiiiiiiiiii
+```
+
+Execute the next instruction IFF `(== a b)`.
+ 
+### IFNE
+Opcode 0x23
+
+```
+100011 _____ aaaaa bbbbb iiiiiiiiiii
+```
+
+Execute the next instruction IFF `(!= a b)`
+ 
+### ADD
+Opcode 0x30
+
+```
+110000 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores `(+ a b)` to the targeted register.
+ 
+### SUB
+Opcode 0x31
+
+```
+110001 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores `(- a b)` to the targeted register.
+ 
+### DIV
+Opcode 0x32
+
+```
+110010 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the integer division of `(/ a b)` to the targeted register.
+Does not store the remainder.
+ 
+### MOD
+Opcode 0x33
+
+```
+110011 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the integer remainder `(mod a b)` to the targeted register.
+ 
+### MUL
+Opcode 0x34
+
+```
+110100 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the product `(* a b)` to the targeted register.
+ 
+### AND
+Opcode 0x35
+
+```
+110101 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the bitwise and of `a` and `b` to the targeted register.
+ 
+### OR
+Opcode 0x36
+
+```
+110110 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the bitwise or of `a` and `b` to the targeted register.
+
+### NAND
+Opcode 0x37
+
+```
+110111 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the bitwise nand of `a` and `b` to the targeted register.
+ 
+### XOR
+Opcode 0x38
+
+```
+111000 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the xor of `a` and `b` to the targeted register.
+ 
+### SL
+Opcode 0x3a
+
+```
+111010 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the left shift of `a` by `b` bits to the target register. 0-extends the
+result, does not rotate.
+
+### SR
+Opcode 0x3b
+
+```
+111011 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the right shift of `a` by `b` bits to the targeted register.
+ 
+### SAL
+Opcode 0x3c
+
+```
+111100 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the arithmatic shift left of `a` by `b` bits to the targeted register.
+
+### SAR
+Opcode 0x3d
+
+```
+111101 ttttt aaaaa bbbbb iiiiiiiiiii
+```
+
+Stores the arithmatic right shift of `a` by `b` bits to the targeted register.
