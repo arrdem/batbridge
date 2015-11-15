@@ -115,13 +115,20 @@
 (def bytecode->opcode
   "Maps bytecodes to their opcodes as per the spec."
 
-  {0x00 :hlt
+  {
+   0x00 :hlt
+   
+   ;; memory ops
    0x10 :ld
    0x11 :st
+
+   ;; control ops
    0x20 :iflt
    0x21 :ifle
    0x22 :ifeq
    0x23 :ifne
+
+   ;; alu ops
    0x30 :add
    0x31 :sub
    0x32 :div
@@ -131,10 +138,14 @@
    0x36 :or
    0x37 :nand
    0x38 :xor
+   ;; 0x39 undefined in v0
    0x3A :sl
    0x3B :sr
    0x3C :sal
-   0x3D :sar})
+   0x3D :sar
+   ;; 0x3E undefined in v0
+   ;; 0x3F undefined in v0
+   })
 
 
 (def register-symbol-map
