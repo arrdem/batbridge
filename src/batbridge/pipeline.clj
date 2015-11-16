@@ -3,12 +3,12 @@
   effort to perform branch prediction, instruction caching or memory
   caching. Correctness with respect to the pipeline and bubbles is
   ensured however."
-  (:require [batbridge [isa :as isa]
-                       [common :as common]
-                       [single-cycle :as ss]]
+  (:require [batbridge
+             [isa :as isa]
+             [common :as common]
+             [single-cycle :as ss]]
             [taoensso.timbre :refer [info warn]]
             [clojure.set :as set]))
-
 
 ;; There is an extra issue in the pipelined processor, one which I
 ;; completely forgot about until misbehavior in my test suite exposed
@@ -35,7 +35,6 @@
 ;; meaningful. The exception to this rule is a pipeline flush, which
 ;; zeros the stall counter and clears all stages.
 
-
 (defn stalled?
   "Checks the stall counter, returning True if the stall counter is
   nonzero. A nil value is treated as zero."
@@ -45,7 +44,6 @@
       (get :stall 0)
       zero? not))
 
-
 (defn fetch
   "Checks the stall counter, invoking ss/fetch if zero otherwise
   returning the input state unmodified due to a pipeline stall."
@@ -54,7 +52,6 @@
   (if (stalled? processor)
     processor
     (ss/fetch processor)))
-
 
 (defn decode
   "Checks the stall counter, invoking ss/decode and checking for a
@@ -78,7 +75,6 @@
                 (dissoc :decode)))
         next-processor))))
 
-
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
   performs the indicated update on the processor state. Update command
@@ -90,40 +86,39 @@
         {:keys [dst addr val npc]} directive]
     (info "[writeback]" directive)
     (cond ;; special case to stop the show
-          (= :halt dst)
-            (assoc processor :halted true)
+      (= :halt dst)
+      (assoc processor :halted true)
 
-          ;; special case for hex code printing
-          (and (= :registers dst)
-               (= 29 addr))
-            (do (when-not (zero? val)
-                  (print (format "0x%X" (char val))))
-                processor)
+      ;; special case for hex code printing
+      (and (= :registers dst)
+           (= 29 addr))
+      (do (when-not (zero? val)
+            (print (format "0x%X" (char val))))
+          processor)
 
-          ;; special case for printing
-          (and (= :registers dst)
-               (= 30 addr))
-            (do (when-not (zero? val)
-                  (print (char val)))
-                processor)
+      ;; special case for printing
+      (and (= :registers dst)
+           (= 30 addr))
+      (do (when-not (zero? val)
+            (print (char val)))
+          processor)
 
-          ;; special case for branching as we must flush the pipeline
-          (and (= :registers dst)
-               (= 31 addr)
-               (not (= val npc))) ;; don't flush if we aren't changing
-                                  ;; the next PC value. This means to
-                                  ;; jumping to PC+4 does exactly
-                                  ;; nothing as it should.
-            (do (warn "[writeback] Flushing pipeline!")
-                (-> processor
-                    (dissoc :fetch)
-                    (dissoc :decode)
-                    (dissoc :execute)
-                    (assoc-in [:registers addr] val)))
+      ;; special case for branching as we must flush the pipeline
+      (and (= :registers dst)
+           (= 31 addr)
+           (not (= val npc))) ;; don't flush if we aren't changing
+      ;; the next PC value. This means to
+      ;; jumping to PC+4 does exactly
+      ;; nothing as it should.
+      (do (warn "[writeback] Flushing pipeline!")
+          (-> processor
+              (dissoc :fetch)
+              (dissoc :decode)
+              (dissoc :execute)
+              (assoc-in [:registers addr] val)))
 
-          true
-            (assoc-in processor [dst addr] val))))
-
+      true
+      (assoc-in processor [dst addr] val))))
 
 (defn stall-dec
   "A dec which deals with a nil argument case, and has a floor value
@@ -134,7 +129,6 @@
              (fn [nillable-value]
                (let [v (or nillable-value 0)]
                  (max 0 (dec v))))))
-
 
 (defn step
   "Sequentially applies each phase of execution to a single processor
@@ -151,7 +145,6 @@
       decode
       fetch
       stall-dec))
-
 
 (defn -main
   "Steps a processor state until such time as it becomes marked as
