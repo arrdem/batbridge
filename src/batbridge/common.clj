@@ -18,7 +18,7 @@
   halted or not yet."
 
   [state]
-  (or (:halted state) false))
+  (:halted state false))
 
 ;; Various processor components refactored out due to commonality
 ;;------------------------------------------------------------------------------
