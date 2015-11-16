@@ -1,18 +1,15 @@
 (ns batbridge.assembler
   "A tiny toolkit for building binary encoded Batbridge opcodes")
 
-
 ;; This code is reproduced from toothpick and is used to hack together
 ;; a simple bit formatting word assembler usable for testing bytecode
 ;; interpreters.
-;;------------------------------------------------------------------------------
+
 (defn- exp [b n]
   (reduce * 1 (repeat n b)))
 
-
 (defn- bit-mask-n [n]
   (- (exp 2 n) 1))
-
 
 (defn- bit-fmt
   "Takes a seq format parameter, followed by an equal number of format values
@@ -30,5 +27,5 @@
                     (bit-and value (bit-mask-n bits))))
           0 (map vector layout args)))
 
-
-(def bb-fmt (partial bit-fmt [6 5 5 5 11]))
+(def bb-fmt
+  (partial bit-fmt [6 5 5 5 11]))
