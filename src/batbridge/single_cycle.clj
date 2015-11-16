@@ -97,8 +97,7 @@
 
       ;; special case for branching as we must flush the pipeline
       [:registers 31 val]
-      ,,(-> processor
-            (assoc-in [:registers addr] val))
+      ,,(assoc-in processor [:registers addr] val)
 
       [:registers r val]
       ,,(assoc-in processor [:registers r] val)
