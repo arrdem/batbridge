@@ -114,7 +114,7 @@
                                   ;; the next PC value. This means to
                                   ;; jumping to PC+4 does exactly
                                   ;; nothing as it should.
-            (do (warn "[writeback] flushing pipeline!")
+            (do (warn "[writeback] Flushing pipeline!")
                 (-> processor
                     (dissoc :fetch)
                     (dissoc :decode)
