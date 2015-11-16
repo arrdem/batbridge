@@ -48,7 +48,7 @@
       (isa/decode-instr v)
       (assoc v :pc pc)
       (assoc v :npc npc)
-      (assoc processor :decode v))))
+      (update processor :decode merge v))))
 
 (defn execute
   "Indexes into the opcode->fn map to fetch the implementation of the
