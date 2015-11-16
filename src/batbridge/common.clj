@@ -1,8 +1,7 @@
 (ns batbridge.common
   "Bits and pieces which were pulled out of various Batbridge
   simulators on the basis of constituting code repetition."
-  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get!
-                                     cache-write!]]))
+  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get! cache-write!]]))
 
 (defn register? 
   "Predicate to test whether or not the argument integer is a valid
@@ -141,3 +140,10 @@
   (make-processor
    {:memory instructions
     :registers {31 0}}))
+
+(defn stalled?
+  "Checks the stall counter, returning True if the stall counter is
+  nonzero. A nil value is treated as zero."
+
+  [processor]
+  (not (zero? (:stall processor 0))))

@@ -20,35 +20,87 @@
         icode (common/get-memory processor pc)
         npc   (+ pc 4)]
     (info "[fetch    ]" pc "->" icode)
-    (if-not (:halted processor)
-      (-> processor
-          (assoc-in [:registers 31] npc)
-          (assoc :fetch {:icode icode
-                         :npc   -1
-                         :pc    npc}))
-      (-> processor
-          (assoc :fetch {:icode [:hlt 0 0 0 0]
-                         :npc   -1
-                         :pc    npc})))))
+    (cond
+      (common/halted? processor)
+      ,,(assoc processor :fetch
+               {:icode isa/vec-no-op
+                :npc   -1
+                :pc    -1})
+      
+      (common/stalled? processor)
+      ,,processor
+
+      :else
+      ,,(-> processor
+            (assoc-in [:registers 31] npc)
+            (assoc :fetch {:icode icode
+                           :npc   (+ npc 4)
+                           :pc    npc})))))
+
+(defn- queue [coll]
+  (into clojure.lang.PersistentQueue/EMPTY coll))
+
+(defn- next-op
+  "Function from a processor to the next operation which the processor
+  needs to perform, the new macro queue and the number of new ops."
+  [processor]
+  (let [;; constants
+        noop     {:icode isa/vec-no-op
+                  :pc    -1}
+        argfn    (juxt :d :a :b :i)
+
+        ;; destructure arguments
+        fetch    (:fetch processor)
+        decode   (:decode processor)
+        icode    (:icode fetch isa/vec-no-op)
+        ops      (:ops decode (queue []))
+
+        ;; main logic
+
+        ;; If the processor is stalled and we have ops in the queue,
+        ;; then we take the first op from the queue. Otherwise we take
+        ;; the op from fetch.
+        [icode ops]    (if (and (common/stalled? processor) ops)
+                         [(peek ops) (pop ops)]
+                         [icode      ops])
+
+        ;; Decode that operation and figure out if it is a
+        ;; macro (macro-fn will be nil if it isn't)
+        di       (isa/decode-instr icode)]
+
+    (if-let [macro-fn (get isa/opcode->macro (:icode di))]
+      ;; If we have a macro-fn, use it to compute the list of new
+      ;; operations we need to perform.
+      (let [new-ops (when macro-fn
+                      (apply macro-fn (argfn di)))
+
+            ;; Note that these operations must occur before anything
+            ;; already in the ops queue.
+            ops     (-> (queue [])
+                        (into (rest new-ops))
+                        (into ops))
+
+            ;; Choose the icode we're going to use. Either it'll be the
+            ;; first of the new icodes because we're about to stall some,
+            ;; or it'll be the icode we had to begin with
+            icode   (first new-ops)]
+        [icode ops (count new-ops)])
+
+      ;; Otherwise there are no new opcodes, don't do anything more.
+      [icode ops 0])))
 
 (defn decode
-  "Dummy decode which translates a vector literal to an icode map. Not
-  really important now because there is no binary decoding to do, but
-  it'll be nice later."
-
   [processor]
-  (let [{:keys [icode pc npc] :as fetch}
-        (get processor :fetch {:icode isa/vec-no-op
-                               :pc    -1})]
-    (info "[decode   ]" icode)
-    (info "[decode   ]" (-> icode
-                            isa/decode-instr
-                            common/fmt-instr))
-    (as-> icode v
-      (isa/decode-instr v)
-      (assoc v :pc pc)
-      (assoc v :npc npc)
-      (update processor :decode merge v))))
+  (if-not (common/halted? processor)
+    (let [[icode queue n]  (next-op processor)
+          di               (isa/decode-instr icode)
+          {:keys [pc npc]} (:fetch processor)]
+      (info "[decode   ]" icode)
+      (info "[decode   ]" (common/fmt-instr di))
+      (-> processor
+          (update :stall (fnil + 0) n)
+          (update :decode merge di {:ops queue :pc pc :npc npc})))
+    processor))
 
 (defn execute
   "Indexes into the opcode->fn map to fetch the implementation of the

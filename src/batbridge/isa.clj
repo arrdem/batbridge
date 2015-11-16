@@ -114,6 +114,16 @@
    :sr   (fn [p pc i x y dst]
            [:registers dst (bit-shift-right x y)])})
 
+(def opcode->macro
+  {
+   :push (fn [dst a b i]
+           [[:sub a   a 29 4]
+            [:st  dst a 30 0]])
+
+   :pop (fn [dst a b i]
+          [[:ld  dst a 30 0]
+           [:add a   a 29 4]])
+   })
 
 (def bytecode->opcode
   "Maps bytecodes to their opcodes as per the spec."
@@ -124,6 +134,8 @@
    ;; memory ops
    0x10 :ld
    0x11 :st
+   0x12 :push
+   0x13 :pop
 
    ;; control ops
    0x20 :iflt
