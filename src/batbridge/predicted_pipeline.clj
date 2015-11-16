@@ -149,7 +149,7 @@
       ;; jumping to PC+4 does exactly
       ;; nothing as it should.
       (do (warn "[writeback] Branch mispredict!")
-          (warn "[writeback] flushing pipeline!")
+          (warn "[writeback] Flushing pipeline!")
           (-> processor
               (update-taken)
               (train-jump (- pc 4) val)
