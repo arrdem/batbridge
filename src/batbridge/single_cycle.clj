@@ -23,7 +23,7 @@
     (cond
       (common/halted? processor)
       ,,(assoc processor
-               :result/fetch
+               :fetch/result
                {:icode isa/vec-no-op
                 :npc   -1
                 :pc    -1})
@@ -34,7 +34,7 @@
       :else
       ,,(-> processor
             (assoc-in [:registers 31] npc)
-            (assoc :result/fetch
+            (assoc :fetch/result
                    {:icode icode
                     :npc   (+ npc 4)
                     :pc    npc})))))
@@ -56,9 +56,9 @@
         argfn       (juxt :d :a :b :i)
 
         ;; destructure arguments
-        fetch       (:result/fetch processor)
+        fetch       (:fetch/result processor)
         decode      (:decode processor)
-        ops         (:ops processor (queue []))
+        ops         (:decode/ops processor (queue []))
         icode       (:icode fetch isa/vec-no-op)
 
         ;; main logic
@@ -100,13 +100,13 @@
   (if-not (common/halted? processor)
     (let [[icode queue n]  (next-op processor)
           di               (isa/decode-instr icode)
-          {:keys [pc npc]} (:result/fetch processor)]
+          {:keys [pc npc]} (:fetch/result processor)]
       (info "[decode   ]" icode)
       (info "[decode   ]" (common/fmt-instr di))
       (-> processor
-          (update :stall (fnil + 0) n)
-          (assoc :ops queue)
-          (assoc :result/decode (merge di {:pc pc :npc npc}))))
+          (update :fetch/stall (fnil + 0) n)
+          (assoc :decode/ops queue
+                 :decode/result (merge di {:pc pc :npc npc}))))
     processor))
 
 (defn execute
@@ -118,7 +118,7 @@
 
   [processor]
   (let [{:keys [icode a b d i pc npc]
-         :as   decode} (get processor :result/decode isa/map-no-op)
+         :as   decode} (get processor :decode/result isa/map-no-op)
         _              (do (assert (keyword? icode))
                            (assert (number? a))
                            (assert (number? b))
@@ -137,7 +137,7 @@
              :pc pc
              :npc npc)
       (assoc processor
-             :result/execute v))))
+             :execute/result v))))
 
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
@@ -146,7 +146,7 @@
   {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
-  (let [directive (get processor :result/execute isa/writeback-no-op)
+  (let [directive (get processor :execute/result isa/writeback-no-op)
         {:keys [dst addr val]} directive]
     (info "[writeback]" directive)
     (match [dst addr val]

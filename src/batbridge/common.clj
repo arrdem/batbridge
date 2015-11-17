@@ -146,4 +146,4 @@
   nonzero. A nil value is treated as zero."
 
   [processor]
-  (not (zero? (:stall processor 0))))
+  (not (zero? (:fetch/stall processor 0))))
