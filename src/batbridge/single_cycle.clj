@@ -119,6 +119,13 @@
   [processor]
   (let [{:keys [icode a b d i pc npc]
          :as   decode} (get processor :result/decode isa/map-no-op)
+        _              (do (assert (keyword? icode))
+                           (assert (number? a))
+                           (assert (number? b))
+                           (assert (number? d))
+                           (assert (number? i))
+                           (assert (number? pc))
+                           (assert (number? npc)))
         srca           (common/register->val processor a pc i)
         srcb           (common/register->val processor b pc i)]
     (info "[execute  ]" decode)
