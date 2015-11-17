@@ -181,10 +181,12 @@
   [vec-instr]
   (case (first vec-instr)
     (:ifeq :ifle :iflt :ifne)
-    ,,(zipmap [:icode :a :b :i] vec-instr)
+    ,,(-> (zipmap [:icode :a :b :i] vec-instr)
+          (assoc :d 0))
     
     (:hlt)
-    ,,(zipmap [:icode] vec-instr)
+    ,,(merge (zipmap [:icode] vec-instr)
+             {:a 0 :b 0 :d 0 :i 0})
 
     ;; else
     ,,(zipmap [:icode :d :a :b :i] vec-instr)))
