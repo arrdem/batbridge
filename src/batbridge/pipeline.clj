@@ -35,45 +35,25 @@
 ;; meaningful. The exception to this rule is a pipeline flush, which
 ;; zeros the stall counter and clears all stages.
 
-(defn stalled?
-  "Checks the stall counter, returning True if the stall counter is
-  nonzero. A nil value is treated as zero."
-
-  [processor]
-  (-> processor
-      (get :stall 0)
-      zero? not))
-
-(defn fetch
-  "Checks the stall counter, invoking ss/fetch if zero otherwise
-  returning the input state unmodified due to a pipeline stall."
-
-  [processor]
-  (if (stalled? processor)
-    processor
-    (ss/fetch processor)))
-
 (defn decode
   "Checks the stall counter, invoking ss/decode and checking for a
   pipeline hazzard in the result if zero otherwise returning the input
   state unmodified due to a pipeline stall."
 
   [processor]
-  (if (stalled? processor)
-    processor
-    (let [next-processor (ss/decode processor)
-          {:keys [decode execute]} next-processor
-          {:keys [dst addr]} execute]
-      (if (and (= :registers dst)
-               (contains? (-> #{}
-                              (into [(:a decode) (:b decode)])
-                              (disj 30 29))
-                          addr))
-        (do (info "[decode   ] stalling the pipeline!")
-            (-> processor
-                (assoc :stall 1)
-                (dissoc :decode)))
-        next-processor))))
+  (let [next-processor           (ss/decode processor)
+        {:keys [decode execute]} next-processor
+        {:keys [dst addr]}       execute]
+    (if (and (= :registers dst)
+             (contains? (-> #{}
+                            (into [(:a decode) (:b decode)])
+                            (disj 30 29))
+                        addr))
+      (do (info "[decode   ] stalling the pipeline!")
+          (-> processor
+              (update :stall (fnil inc 0))
+              (dissoc :decode)))
+      next-processor)))
 
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
@@ -143,7 +123,7 @@
       writeback
       ss/execute
       decode
-      fetch
+      ss/fetch
       stall-dec))
 
 (defn -main

@@ -101,17 +101,15 @@
   returning the input state unmodified due to a pipeline stall."
 
   [processor]
-  (if (p/stalled? processor)
+  (if (common/stalled? processor)
     processor
-    (let [pc    (common/register->val processor 31)
-          icode (common/get-memory processor pc)
-          npc   (next-pc processor)]
-      (info "[fetch    ]" pc "->" icode " npc:" npc)
+    (let [pc        (common/register->val processor 31)
+          processor (ss/fetch processor)
+          npc       (next-pc processor)]
+      (info "[fetch    ]" pc "->" npc)
       (-> processor
           (assoc-in [:registers 31] npc)
-          (assoc :fetch {:icode icode
-                         :npc   npc
-                         :pc    (+ pc 4)})))))
+          (assoc-in [:fetch :npc] npc)))))
 
 (defn writeback
   "Pulls a writeback directive out of the processor state, and

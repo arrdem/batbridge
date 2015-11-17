@@ -5,8 +5,8 @@
   differing processor implementations."
   (:require [clojure.core.match :refer [match]]
             [batbridge
-             ,,[common :as common]
-             ,,[isa :as isa]]
+             [common :as common]
+             [isa :as isa]]
             [taoensso.timbre :refer [info warn]]))
 
 (defn fetch
@@ -26,7 +26,7 @@
                {:icode isa/vec-no-op
                 :npc   -1
                 :pc    -1})
-      
+
       (common/stalled? processor)
       ,,processor
 
@@ -44,29 +44,33 @@
   "Function from a processor to the next operation which the processor
   needs to perform, the new macro queue and the number of new ops."
   [processor]
+  {:post [(or (number? (first %))
+              (vector? (first %)))
+          (instance? clojure.lang.PersistentQueue (second %))
+          (number? (last %))]}
   (let [;; constants
-        noop     {:icode isa/vec-no-op
-                  :pc    -1}
-        argfn    (juxt :d :a :b :i)
+        noop        {:icode isa/vec-no-op
+                     :pc    -1}
+        argfn       (juxt :d :a :b :i)
 
         ;; destructure arguments
-        fetch    (:fetch processor)
-        decode   (:decode processor)
-        icode    (:icode fetch isa/vec-no-op)
-        ops      (:ops decode (queue []))
+        fetch       (:fetch processor)
+        decode      (:decode processor)
+        ops         (:ops processor (queue []))
+        icode       (:icode fetch isa/vec-no-op)
 
         ;; main logic
 
         ;; If the processor is stalled and we have ops in the queue,
         ;; then we take the first op from the queue. Otherwise we take
         ;; the op from fetch.
-        [icode ops]    (if (and (common/stalled? processor) ops)
-                         [(peek ops) (pop ops)]
-                         [icode      ops])
+        [icode ops] (if (and (common/stalled? processor) ops)
+                      [(peek ops) (pop ops)]
+                      [icode      ops])
 
         ;; Decode that operation and figure out if it is a
         ;; macro (macro-fn will be nil if it isn't)
-        di       (isa/decode-instr icode)]
+        di          (isa/decode-instr icode)]
 
     (if-let [macro-fn (get isa/opcode->macro (:icode di))]
       ;; If we have a macro-fn, use it to compute the list of new
@@ -99,7 +103,8 @@
       (info "[decode   ]" (common/fmt-instr di))
       (-> processor
           (update :stall (fnil + 0) n)
-          (update :decode merge di {:ops queue :pc pc :npc npc})))
+          (assoc  :ops queue)
+          (update :decode merge di {:pc pc :npc npc})))
     processor))
 
 (defn execute
@@ -115,6 +120,7 @@
         srca           (common/register->val processor a pc i)
         srcb           (common/register->val processor b pc i)]
     (info "[execute  ]" decode)
+    #_(println decode srca srcb)
     (as-> icode v
       (get isa/opcode->fn v)
       (v processor pc i srca srcb d)
