@@ -22,7 +22,8 @@
     (info "[fetch    ]" pc "->" icode)
     (cond
       (common/halted? processor)
-      ,,(assoc processor :fetch
+      ,,(assoc processor
+               :result/fetch
                {:icode isa/vec-no-op
                 :npc   -1
                 :pc    -1})
@@ -33,9 +34,10 @@
       :else
       ,,(-> processor
             (assoc-in [:registers 31] npc)
-            (assoc :fetch {:icode icode
-                           :npc   (+ npc 4)
-                           :pc    npc})))))
+            (assoc :result/fetch
+                   {:icode icode
+                    :npc   (+ npc 4)
+                    :pc    npc})))))
 
 (defn- queue [coll]
   (into clojure.lang.PersistentQueue/EMPTY coll))
@@ -54,7 +56,7 @@
         argfn       (juxt :d :a :b :i)
 
         ;; destructure arguments
-        fetch       (:fetch processor)
+        fetch       (:result/fetch processor)
         decode      (:decode processor)
         ops         (:ops processor (queue []))
         icode       (:icode fetch isa/vec-no-op)
@@ -98,13 +100,13 @@
   (if-not (common/halted? processor)
     (let [[icode queue n]  (next-op processor)
           di               (isa/decode-instr icode)
-          {:keys [pc npc]} (:fetch processor)]
+          {:keys [pc npc]} (:result/fetch processor)]
       (info "[decode   ]" icode)
       (info "[decode   ]" (common/fmt-instr di))
       (-> processor
           (update :stall (fnil + 0) n)
-          (assoc  :ops queue)
-          (update :decode merge di {:pc pc :npc npc})))
+          (assoc :ops queue)
+          (assoc :result/decode (merge di {:pc pc :npc npc}))))
     processor))
 
 (defn execute
@@ -116,18 +118,18 @@
 
   [processor]
   (let [{:keys [icode a b d i pc npc]
-         :as   decode} (get processor :decode isa/map-no-op)
+         :as   decode} (get processor :result/decode isa/map-no-op)
         srca           (common/register->val processor a pc i)
         srcb           (common/register->val processor b pc i)]
     (info "[execute  ]" decode)
-    #_(println decode srca srcb)
+    (println decode srca srcb)
     (as-> icode v
       (get isa/opcode->fn v)
       (v processor pc i srca srcb d)
       (common/upgrade-writeback-command v)
       (assoc v :pc pc)
       (assoc v :npc npc)
-      (assoc processor :execute v))))
+      (assoc processor :result/execute v))))
 
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
@@ -136,7 +138,7 @@
   {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
-  (let [directive (get processor :execute isa/writeback-no-op)
+  (let [directive (get processor :result/execute isa/writeback-no-op)
         {:keys [dst addr val]} directive]
     (info "[writeback]" directive)
     (match [dst addr val]
