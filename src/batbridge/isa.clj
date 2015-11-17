@@ -10,7 +10,6 @@
              ,,[common
                 :refer [register->val get-memory]]]))
 
-
 ;; No-op constants for the various stages
 ;;------------------------------------------------------------------------------
 (def map-no-op
@@ -24,13 +23,11 @@
    :i     0
    :pc    -1})
 
-
 (def vec-no-op
   "Vector constant representing a no-op. May be used by fetch stages
   in lieu of a meaningful fetched value." 
 
   [:add 30 30 30 0])
-
 
 (def bytecode-no-op
   "Long constant representing the bytecode encoding of 
@@ -38,7 +35,6 @@
   fetched value."
 
   0xC3DEF000)
-
 
 (def writeback-no-op
   "Writeback instruction which will do exactly nothing!"
@@ -162,7 +158,6 @@
    ;; 0x3F undefined in v0
    })
 
-
 (def register-symbol-map
   "Provides translation from the shorthand keyword symbols used to
   identify registers to their integer index IDs."
@@ -171,7 +166,6 @@
       (assoc :r_IMM  29)
       (assoc :r_ZERO 30)
       (assoc :r_PC   31)))
-
 
 ;; The decode operation which is entirely common to all the processors
 ;;------------------------------------------------------------------------------
@@ -191,12 +185,10 @@
     ;; else
     ,,(zipmap [:icode :d :a :b :i] vec-instr)))
 
-
 (defn normalize-icode
   "Does integer to symbol remapping for the icode of a decoded instr."
   [{:keys [icode] :as decode}]
   (assoc decode :icode (get bytecode->opcode icode icode)))
-
 
 (defn normalize-registers
   "Does symbol to integer normalization for the register parameters of
@@ -206,7 +198,6 @@
       (assoc :a (get register-symbol-map a a))
       (assoc :b (get register-symbol-map b b))
       (assoc :d (get register-symbol-map d d))))
-
 
 (defn decode-instr
   "A somewhat more heavy duty decode. Determines whether the icode to
@@ -219,7 +210,7 @@
   [icode-maybe]
   (when-not (nil? icode-maybe)
     (cond-> icode-maybe
-            (vector?  icode-maybe) vec->symbol-map
-            (integer? icode-maybe) word->symbol-map
-            true                   normalize-icode
-            true                   normalize-registers)))
+      (vector?  icode-maybe) vec->symbol-map
+      (integer? icode-maybe) word->symbol-map
+      true                   normalize-icode
+      true                   normalize-registers)))
