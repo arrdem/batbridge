@@ -126,9 +126,11 @@
       (get isa/opcode->fn v)
       (v processor pc i srca srcb d)
       (common/upgrade-writeback-command v)
-      (assoc v :pc pc)
-      (assoc v :npc npc)
-      (assoc processor :result/execute v))))
+      (assoc v
+             :pc pc
+             :npc npc)
+      (assoc processor
+             :result/execute v))))
 
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
