@@ -122,7 +122,6 @@
         srca           (common/register->val processor a pc i)
         srcb           (common/register->val processor b pc i)]
     (info "[execute  ]" decode)
-    (println decode srca srcb)
     (as-> icode v
       (get isa/opcode->fn v)
       (v processor pc i srca srcb d)
