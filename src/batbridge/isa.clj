@@ -8,7 +8,7 @@
              ,,[bytecode
                 :refer [word->symbol-map]]
              ,,[common
-                :refer [register->val get-memory]]]))
+                :refer [register->val get-memory normalize-address]]]))
 
 ;; No-op constants for the various stages
 ;;------------------------------------------------------------------------------
@@ -41,10 +41,6 @@
 
   {:dst :registers :addr 30 :val 0 :pc -1})
 
-(defn- word-round-down
-  "Rounds x to the nearest multiple of 4 preserving sign in the direction of 0"
-  [x] (bit-and x (bit-not 3)))
-
 ;; The  common opcode implementation map
 ;;------------------------------------------------------------------------------
 (def opcode->fn
@@ -56,13 +52,13 @@
            [:halt nil nil])
 
    :ld   (fn [p pc i x y dst]
-           (let [a (word-round-down (+ x (* 4 y)))
+           (let [a (normalize-address (+ x (* 4 y)))
                  v (get-memory p a)]
              [:registers dst v]))
 
    :st   (fn [p pc i x y dst]
            (let [v   (register->val p dst pc i)
-                 dst (word-round-down (+ x (* 4 y)))]
+                 dst (normalize-address (+ x (* 4 y)))]
              [:memory dst v]))
 
    :iflt (fn [p pc i x y dst]

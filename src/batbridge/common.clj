@@ -147,3 +147,7 @@
 
   [processor]
   (not (zero? (:fetch/stall processor 0))))
+
+(defn normalize-address
+  "Rounds down to the nearest multiple of 4"
+  [x] (bit-and x (bit-not 3)))
