@@ -80,6 +80,11 @@
      (:r_IMM  29) imm
      (get-register processor reg))))
 
+(defn write-register
+  [p r v]
+  {:pre [(not (#{:r_IMM 29} r))]}
+  (assoc-in p [:registers (normalize-register r)] v))
+
 (defn upgrade-writeback-command
   "Transforms an old vector writeback command into the new map
   structure, thus allowing for pc data to be preserved."
