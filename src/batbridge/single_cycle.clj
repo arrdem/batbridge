@@ -140,6 +140,9 @@
       (assoc processor
              :execute/result v))))
 
+(defn ^:dynamic branch [processor address]
+  (assoc-in processor [31 (common/normalize-address address)]))
+
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
   performs the indicated update on the processor state. Update command
