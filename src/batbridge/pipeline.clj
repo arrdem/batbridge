@@ -41,9 +41,10 @@
   state unmodified due to a pipeline stall."
 
   [processor]
-  (let [next-processor           (ss/decode processor)
-        {:keys [decode execute]} next-processor
-        {:keys [dst addr]}       execute]
+  (let [next-processor     (ss/decode processor)
+        decode             (:decode/result next-processor)
+        execute            (:execute/result next-processor)
+        {:keys [dst addr]} execute]
     (if (and (= :registers dst)
              (contains? (-> #{}
                             (into [(:a decode) (:b decode)])
@@ -62,43 +63,33 @@
   {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
-  (let [directive (get processor :execute [:registers 30 0])
-        {:keys [dst addr val npc]} directive]
+  (let [directive                  (get processor
+                                        :execute/result
+                                        [:registers 30 0])
+        {:keys [dst addr val npc]} directive
+
+        ;; Use the perfectly functional single cycle implementation of
+        ;; all this stuff
+        processor                  (ss/writeback processor)]
     (info "[writeback]" directive)
-    (cond ;; special case to stop the show
-      (= :halt dst)
-      (assoc processor :halted true)
-
-      ;; special case for hex code printing
-      (and (= :registers dst)
-           (= 29 addr))
-      (do (when-not (zero? val)
-            (print (format "0x%X" (char val))))
-          processor)
-
-      ;; special case for printing
-      (and (= :registers dst)
-           (= 30 addr))
-      (do (when-not (zero? val)
-            (print (char val)))
-          processor)
-
+    (cond
       ;; special case for branching as we must flush the pipeline
       (and (= :registers dst)
            (= 31 addr)
-           (not (= val npc))) ;; don't flush if we aren't changing
-      ;; the next PC value. This means to
-      ;; jumping to PC+4 does exactly
-      ;; nothing as it should.
-      (do (warn "[writeback] Flushing pipeline!")
-          (-> processor
-              (dissoc :fetch)
-              (dissoc :decode)
-              (dissoc :execute)
-              (assoc-in [:registers addr] val)))
+           ;; don't flush if we aren't changing
+           ;; the next PC value. This means to
+           ;; jumping to PC+4 does exactly
+           ;; nothing as it should.
+           (not (= val npc)))
+      ,,(do (warn "[writeback] Flushing pipeline!")
+            (-> processor
+                (dissoc :fetch/result
+                        :decode/result
+                        :execute/result)
+                (assoc-in [:registers addr] val)))
 
       true
-      (assoc-in processor [dst addr] val))))
+      ,,processor)))
 
 (defn stall-dec
   "A dec which deals with a nil argument case, and has a floor value

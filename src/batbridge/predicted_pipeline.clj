@@ -118,58 +118,43 @@
   {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
-  (let [directive (get processor :execute [:registers 30 0])
-        {:keys [dst addr val pc npc]} directive]
+  (let [directive                     (get processor :execute [:registers 30 0])
+        {:keys [dst addr val pc npc]} directive
+        processor                     (ss/writeback processor)]
     (info "[writeback]" directive)
-    (cond ;; special case to stop the show
-      (= :halt dst)
-      (assoc processor :halted true)
-
-      ;; special case for hex code printing
-      (and (= :registers dst)
-           (= 29 addr))
-      (do (when-not (zero? val)
-            (print (format "0x%X" (char val))))
-          processor)
-
-      ;; special case for printing
-      (and (= :registers dst)
-           (= 30 addr))
-      (do (when-not (zero? val)
-            (print (char val)))
-          processor)
-
+    (cond
       ;; special case for branching as we must flush the pipeline
       (and (= :registers dst)
            (= 31 addr)
-           (not (= val npc))) ;; don't flush if we aren't changing
-      ;; the next PC value. This means to
-      ;; jumping to PC+4 does exactly
-      ;; nothing as it should.
-      (do (warn "[writeback] Branch mispredict!")
-          (warn "[writeback] Flushing pipeline!")
-          (-> processor
-              (update-taken)
-              (train-jump (- pc 4) val)
-              (dissoc :fetch)
-              (dissoc :decode)
-              (dissoc :execute)
-              (assoc-in [:registers addr] val)))
+           ;; don't flush if we aren't changing
+           ;; the next PC value. This means to
+           ;; jumping to PC+4 does exactly
+           ;; nothing as it should.
+           (not (= val npc)))
+      ,,(do (warn "[writeback] Branch mispredict!")
+            (warn "[writeback] Flushing pipeline!")
+            (-> processor
+                (update-taken)
+                (train-jump (- pc 4) val)
+                (dissoc :fetch/result
+                        :decode/result
+                        :execute/result)
+                (assoc-in [:registers addr] val)))
 
       ;; special case for correctly predicted branching
       (and (= :registers dst)
            (= 31 addr)
-           (= val npc)) ;; In this case we need to reinforce the
-      ;; branch prediction.
-      (do  (info "[writeback] Branch predicted!")
-           (-> processor
-               (update-taken)
-               (train-jump (- pc 4) val)))
+           ;; In this case we need to reinforce the
+           ;; branch prediction.
+           (= val npc)) 
+      ,,(do  (info "[writeback] Branch predicted!")
+             (-> processor
+                 (update-taken)
+                 (train-jump (- pc 4) val)))
 
       true
-      (-> processor
-          (update-not-taken)
-          (assoc-in [dst addr] val)))))
+      ,,(-> processor
+            (update-not-taken)))))
 
 (defn step
   "Sequentially applies each phase of execution to a single processor

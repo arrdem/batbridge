@@ -24,7 +24,8 @@
       (common/halted? processor)
       ,,(assoc processor
                :fetch/result
-               {:icode isa/vec-no-op
+               {:icode :hlt
+                :a 30 :b 30 :d 30 :i 0
                 :npc   -1
                 :pc    -1})
 
@@ -118,14 +119,14 @@
 
   [processor]
   (let [{:keys [icode a b d i pc npc]
+         :or   {pc    -1
+                npc   -1
+                icode :add
+                a     30
+                b     30
+                d     30
+                i     0}
          :as   decode} (get processor :decode/result isa/map-no-op)
-        _              (do (assert (keyword? icode))
-                           (assert (number? a))
-                           (assert (number? b))
-                           (assert (number? d))
-                           (assert (number? i))
-                           (assert (number? pc))
-                           (assert (number? npc)))
         srca           (common/register->val processor a pc i)
         srcb           (common/register->val processor b pc i)]
     (info "[execute  ]" decode)
