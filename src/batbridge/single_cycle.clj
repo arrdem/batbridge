@@ -21,7 +21,7 @@
         npc   (+ pc 4)]
     (cond
       (common/halted? processor)
-      ,,(do (warn "[fetch    ] halted!")
+      ,,(do (warn "[fetch    ] Halted!")
             (assoc processor
                    :fetch/result
                    {:blob isa/vec-no-op
@@ -29,7 +29,7 @@
                     :pc   -1}))
 
       (common/stalled? processor)
-      ,,(do (info "[fetch    ] stalled!")
+      ,,(do (info "[fetch    ] Stalled!")
             (assoc processor
                    :fetch/result
                    {:blob isa/vec-no-op

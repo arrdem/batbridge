@@ -60,9 +60,6 @@
               (common/write-register 31 (- pc 4))))
       next-processor)))
 
-(def ^:dynamic post-correct-prediction-hook identity)
-(def ^:dynamic post-incorrect-prediction-hook identity)
-
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
   performs the indicated update on the processor state. Update command
@@ -84,7 +81,7 @@
       ;; good.
       [:registers 31 pc]
       ,,(do (info "[writeback] Next PC is" pc "not flushing pipeline")
-            (post-correct-prediction-hook processor))
+            processor)
 
       ;; Case of writing a different value to the PC, this being a
       ;; branch and forcing pipeline stall.
@@ -92,11 +89,10 @@
       ,,(do (warn "[writeback] Flushing pipeline!")
             (-> processor
                 (dissoc :fetch/result
-                        :decode/result)
-                post-incorrect-prediction-hook))
+                        :decode/result)))
 
       :else
-      ,,(post-correct-prediction-hook processor))))
+      ,,processor)))
 
 (defn stall-dec
   "A dec which deals with a nil argument case, and has a floor value

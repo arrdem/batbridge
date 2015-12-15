@@ -8,6 +8,7 @@
              [pipeline :as p]
              [common :as common]
              [bytecode :refer [word->opcode]]]
+            [clojure.core.match :refer [match]]
             [taoensso.timbre :refer [info warn]]
             [amalloy.ring-buffer :refer [ring-buffer]]))
 
@@ -83,8 +84,8 @@
   [processor outcome]
   (update-in processor [:predictor :hst]
              (fn [hist]
-               (into (ring-buffer 9)
-                     (conj hist outcome)))))
+               (let [hist (or hist (into (ring-buffer 9) (repeat 10 false)))]
+                 (conj hist outcome)))))
 
 (defn update-taken
   [processor]
@@ -97,11 +98,11 @@
 ;;------------------------------------------------------------------------------
 ;; Implement the bits of the processor that have to change
 
-(defn branch? [{:keys [icode] :as result}]
-  (or (when (number? icode)
-        (not= 0 (bit-and (word->opcode icode) 0x20)))
-      (when (vector? icode)
-        (#{:ifeq :iflt :ifle :ifne} (first icode)))))
+(defn branch? [{:keys [blob] :as result}]
+  (or (when (number? blob)
+        (not= 0 (bit-and (word->opcode blob) 0x20)))
+      (when (vector? blob)
+        (#{:ifeq :iflt :ifle :ifne} (first blob)))))
 
 (defn fetch
   "Checks the stall counter, invoking ss/fetch if zero otherwise
@@ -113,17 +114,19 @@
     (let [pc        (common/register->val processor 31)
           processor (ss/fetch processor)
           npc       (if (branch? (:fetch/result processor))
-                      (next-pc processor)
+                      (let [pred (next-pc processor)]
+                        (warn "[fetch    ] Using a prediction!")
+                        pred)
                       (+ pc 4))]
       (info "[fetch    ]" pc "->" npc)
       (-> processor
-          (assoc-in [:registers 31] npc)
-          (assoc-in [:fetch :npc] npc)))))
+          (common/write-register 31 npc)
+          (assoc-in [:fetch/result :npc] npc)))))
 
 (defn fixup-prediction [processor]
   (let [directive                     (get processor :execute/result [:registers 30 0])
         {:keys [dst val pc]} directive]
-    (info "[retrain  ] changing a wrong prediction :(")
+    (info "[retrain  ] Changing a wrong prediction :(")
     (-> processor
         (update-taken)
         (train-jump (- pc 4) val))))
@@ -132,11 +135,40 @@
   (let [directive                     (get processor :execute/result [:registers 30 0])
         {:keys [dst npc pc]} directive]
     (if (and pc npc)
-      (do (info "[train    ] training a correct prediction up!")
+      (do (info "[train    ] Training a correct prediction up!")
           (-> processor
               (update-taken)
               (train-jump (- pc 4) npc)))
       processor)))
+
+(defn writeback
+  "Pulls a writeback directive out of the processor state, and
+  performs the indicated update on the processor state. Update command
+  have been restructured and are now maps
+  {:dst (U :registers :halt :memory) :addr Int :val Int}."
+
+  [processor]
+  (let [processor                  (ss/writeback processor)
+        directive                  (get processor
+                                        :execute/result
+                                        [:registers 30 0])
+        {:keys [dst addr val pc npc]} directive
+
+        ;; Use the perfectly functional single cycle implementation of
+        ;; all this stuff
+        ]
+    (match [dst addr val]
+      ;; Case of writing a different value to the PC, this being a
+      ;; branch and forcing pipeline stall.
+      [:registers 31 _]
+      ,,(do (warn "[writeback] Flushing pipeline!" pc "->" val)
+            (-> processor
+                (dissoc :fetch/result
+                        :decode/result)
+                fixup-prediction))
+
+      :else
+      ,,(correct-prediction processor))))
 
 (defn step
   "Sequentially applies each phase of execution to a single processor
@@ -147,16 +179,12 @@
   storing the state between clock 'cycles'."
 
   [state]
-  (let [train (comp correct-prediction p/post-correct-prediction-hook)
-        fix   (comp fixup-prediction p/post-incorrect-prediction-hook)]
-    (binding [p/post-correct-prediction-hook   train
-              p/post-incorrect-prediction-hook fix]
-      (-> state
-          p/writeback
-          ss/execute
-          p/decode
-          fetch
-          p/stall-dec))))
+  (-> state
+      writeback
+      ss/execute
+      p/decode
+      fetch
+      p/stall-dec))
 
 (defn -main
   "Steps a processor state until such time as it becomes marked as
