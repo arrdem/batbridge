@@ -44,20 +44,18 @@
   [processor]
   (let [next-processor     (ss/decode processor)
         {:keys [pc]
-         :as   decode}     (:decode/result next-processor)
-        execute            (:execute/result next-processor)
+         :as   decode}     (:decode/result next-processor ss/decode-default)
+        execute            (:execute/result next-processor ss/execute-default)
         {:keys [dst addr]} execute]
     (if (and (= :registers dst)
              (contains? (-> #{}
                             (into [(:a decode) (:b decode)])
                             (disj 30 29))
                         addr))
-      (do (info "[decode   ] stalling the pipeline!")
+      (do (info "[decode   ] stalling the pipeline! decoded instr \"pc\" was" pc)
           (-> processor
               (update :fetch/stall (fnil inc 0))
-              (dissoc :decode/result
-                      :fetch/result)
-              (common/write-register 31 (- pc 4))))
+              (assoc :decode/result ss/decode-default)))
       next-processor)))
 
 (defn writeback
@@ -69,7 +67,7 @@
   [processor]
   (let [directive                  (get processor
                                         :execute/result
-                                        [:registers 30 0])
+                                        isa/writeback-no-op)
         {:keys [dst addr val pc]} directive
 
         ;; Use the perfectly functional single cycle implementation of
@@ -88,24 +86,11 @@
       [:registers 31 _]
       ,,(do (warn "[writeback] Flushing pipeline!")
             (-> processor
-                (dissoc :fetch/result
-                        :decode/result)))
+                (assoc :fetch/result  ss/fetch-default
+                       :decode/result ss/decode-default)))
 
       :else
       ,,processor)))
-
-(defn stall-dec
-  "A dec which deals with a nil argument case, and has a floor value
-  of 0."
-
-  [{:keys [fetch/stall]
-    :as processor
-    :or {stall 0}}]
-  (info "[stall-dec] decrementing stall count" stall)
-  (update-in processor [:fetch/stall]
-             (fn [nillable-value]
-               (let [v (or nillable-value 0)]
-                 (max 0 (dec v))))))
 
 (defn step
   "Sequentially applies each phase of execution to a single processor
@@ -120,8 +105,7 @@
       writeback
       ss/execute
       decode
-      ss/fetch
-      stall-dec))
+      ss/fetch))
 
 (defn -main
   "Steps a processor state until such time as it becomes marked as

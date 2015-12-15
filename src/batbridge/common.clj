@@ -1,7 +1,8 @@
 (ns batbridge.common
   "Bits and pieces which were pulled out of various Batbridge
   simulators on the basis of constituting code repetition."
-  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get! cache-write!]]))
+  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get! cache-write!]]
+            [taoensso.timbre :refer [warn]]))
 
 (defn register? 
   "Predicate to test whether or not the argument integer is a valid
@@ -84,7 +85,10 @@
 (defn write-register
   [p r v]
   {:pre [(not (#{:r_IMM 29} r))]}
-  (assoc-in p [:registers (normalize-register r)] v))
+  (let [target (normalize-register r)]
+    #_(when (= target 31)
+        (warn "[write-reg] setting PC to" v))
+    (assoc-in p [:registers target] v)))
 
 (defn upgrade-writeback-command
   "Transforms an old vector writeback command into the new map
