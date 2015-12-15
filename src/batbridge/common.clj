@@ -27,8 +27,9 @@
   into unset instructions. Note that this function will behave badly
   if there is not an installed cache hierarchy."
 
-  [p addr]
-  (cache-get! (:memory p) addr))
+  [{:keys [memory] :as p} addr]
+  {:pre [(= 0 (mod addr 4))]}
+  (cache-get! memory addr))
 
 (defn write-memory
   "Writes the argument value into the processor state's memory,
@@ -113,13 +114,20 @@
   traditional inline notation for a processor to a fully fledged cache
   hierarchy equiped structure." 
 
-  [{:keys [regs memory]}]
-  (let [initial-state 
-        {:registers regs
-         :memory (make-cache-hierarchy
-                  [[1 128] [2 512] [4 2048] [16 Long/MAX_VALUE]])}]
-    (doseq [[k v] memory]
-      (cache-write! (:memory initial-state) k v))
+  [{:keys [register-image
+           memory-image
+           cache-spec]
+    :as spec
+    :or {cache-spec [[1 128]
+                     [2 512]
+                     [4 2048]
+                     [16 Long/MAX_VALUE]]}}]
+  (let [memory        (make-cache-hierarchy cache-spec)
+        initial-state {:halted    false
+                       :registers register-image
+                       :memory    memory}]
+    (doseq [[addr v] memory-image]
+      (cache-write! memory addr v))
 
     initial-state))
 
@@ -143,8 +151,8 @@
   
   [instructions]
   (make-processor
-   {:memory instructions
-    :registers {31 0}}))
+   {:memory-image   instructions
+    :register-image {31 0}}))
 
 (defn stalled?
   "Checks the stall counter, returning True if the stall counter is
@@ -155,4 +163,5 @@
 
 (defn normalize-address
   "Rounds down to the nearest multiple of 4"
-  [x] (bit-and x (bit-not 3)))
+  [x]
+  (bit-and x (bit-not 3)))

@@ -184,7 +184,8 @@
 (defn normalize-icode
   "Does integer to symbol remapping for the icode of a decoded instr."
   [{:keys [icode] :as decode}]
-  (assoc decode :icode (get bytecode->opcode icode icode)))
+  {:pre [(map? decode)]}
+  (update decode :icode #(get bytecode->opcode % %)))
 
 (defn normalize-registers
   "Does symbol to integer normalization for the register parameters of

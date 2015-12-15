@@ -26,11 +26,17 @@
                :fetch/result
                {:icode :hlt
                 :a 30 :b 30 :d 30 :i 0
-                :npc   -1
-                :pc    -1})
+                :npc -1
+                :pc  -1})
 
       (common/stalled? processor)
-      ,,processor
+      ,,(do (info "[fetch    ] stalled!")
+            (assoc processor
+                   :fetch/result
+                   {:icode :add
+                    :a 30 :b 30 :d :30 :i 0
+                    :npc -1
+                    :pc  -1}))
 
       :else
       ,,(-> processor
@@ -57,23 +63,21 @@
         argfn       (juxt :d :a :b :i)
 
         ;; destructure arguments
-        fetch       (:fetch/result processor)
-        decode      (:decode processor)
         ops         (:decode/ops processor (queue []))
-        icode       (:icode fetch isa/vec-no-op)
 
         ;; main logic
+
+        fetch       (:fetch/result processor isa/vec-no-op)
+        ;; Decode that operation and figure out if it is a
+        ;; macro (macro-fn will be nil if it isn't)
+        di          (isa/decode-instr fetch)
 
         ;; If the processor is stalled and we have ops in the queue,
         ;; then we take the first op from the queue. Otherwise we take
         ;; the op from fetch.
         [icode ops] (if (and (common/stalled? processor) ops)
                       [(peek ops) (pop ops)]
-                      [icode      ops])
-
-        ;; Decode that operation and figure out if it is a
-        ;; macro (macro-fn will be nil if it isn't)
-        di          (isa/decode-instr icode)]
+                      [fetch      ops])]
 
     (if-let [macro-fn (get isa/opcode->macro (:icode di))]
       ;; If we have a macro-fn, use it to compute the list of new
@@ -94,7 +98,7 @@
         [icode ops (count new-ops)])
 
       ;; Otherwise there are no new opcodes, don't do anything more.
-      [icode ops 0])))
+      [fetch ops 0])))
 
 (defn decode
   [processor]
@@ -102,7 +106,7 @@
     (let [[icode queue n]  (next-op processor)
           di               (isa/decode-instr icode)
           {:keys [pc npc]} (:fetch/result processor)]
-      (info "[decode   ]" icode)
+      #_(info "[decode   ]" icode)
       (info "[decode   ]" (common/fmt-instr di))
       (-> processor
           (update :fetch/stall (fnil + 0) n)
@@ -129,7 +133,7 @@
          :as   decode} (get processor :decode/result isa/map-no-op)
         srca           (common/register->val processor a pc i)
         srcb           (common/register->val processor b pc i)]
-    (info "[execute  ]" decode)
+    (info "[execute  ]" ((juxt :icode :d :a :b :i) decode))
     (as-> icode v
       (get isa/opcode->fn v)
       (v processor pc i srca srcb d)
@@ -150,9 +154,9 @@
   {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
-  (let [directive (get processor :execute/result isa/writeback-no-op)
+  (let [directive              (get processor :execute/result isa/writeback-no-op)
         {:keys [dst addr val]} directive]
-    (info "[writeback]" directive)
+    (info "[writeback]" [dst addr val])
     (match [dst addr val]
       [:halt _ _]
       ,,(assoc processor :halted true)

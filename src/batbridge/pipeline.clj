@@ -8,7 +8,8 @@
              [common :as common]
              [single-cycle :as ss]]
             [taoensso.timbre :refer [info warn]]
-            [clojure.set :as set]))
+            [clojure.set :as set]
+            [clojure.core.match :refer [match]]))
 
 ;; There is an extra issue in the pipelined processor, one which I
 ;; completely forgot about until misbehavior in my test suite exposed
@@ -52,7 +53,7 @@
                         addr))
       (do (info "[decode   ] stalling the pipeline!")
           (-> processor
-              (update :stall (fnil inc 0))
+              (update :fetch/stall (fnil inc 0))
               (dissoc :decode)))
       next-processor)))
 
@@ -71,32 +72,34 @@
         ;; Use the perfectly functional single cycle implementation of
         ;; all this stuff
         processor                  (ss/writeback processor)]
-    (info "[writeback]" directive)
-    (cond
-      ;; special case for branching as we must flush the pipeline
-      (and (= :registers dst)
-           (= 31 addr)
-           ;; don't flush if we aren't changing
-           ;; the next PC value. This means to
-           ;; jumping to PC+4 does exactly
-           ;; nothing as it should.
-           (not (= val npc)))
-      ,,(do (warn "[writeback] Flushing pipeline!")
-            (-> processor
-                (dissoc :fetch/result
-                        :decode/result
-                        :execute/result)
-                (assoc-in [:registers addr] val)))
+    (match [dst addr val]
+      ;; Case of writing a the next PC back to the PC, in which case
+      ;; we don't have to stall or do anything fancy because life is
+      ;; good.
+      [:registers 31 npc]
+      ,,processor
 
-      true
+      ;; Case of writing a different value to the PC, this being a
+      ;; branch and forcing pipeline stall.
+      [:registers 31 _]
+      ,,(do (warn "[writeback] Flushing pipeline!")
+            (dissoc processor
+                    :fetch/result
+                    :decode/result
+                    :execute/result))
+
+      :else
       ,,processor)))
 
 (defn stall-dec
   "A dec which deals with a nil argument case, and has a floor value
   of 0."
 
-  [processor]
-  (update-in processor [:stall]
+  [{:keys [fetch/stall]
+    :as processor
+    :or {stall 0}}]
+  (info "[stall-dec] decrementing stall count" stall)
+  (update-in processor [:fetch/stall]
              (fn [nillable-value]
                (let [v (or nillable-value 0)]
                  (max 0 (dec v))))))

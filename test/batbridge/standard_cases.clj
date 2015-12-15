@@ -3,23 +3,20 @@
   input memory and a final register state with a bound on the number
   of cycles to run."
   (:require [batbridge
-             ,,[assembler :as a]
-             ,,[common :as c]
-             ,,[isa :as i]
-             ,,[bytecode :as b]]
-            [toothpick.assembler
-             :refer [assemble]]
-            [toothpick.isa.batbridge
-             :refer [batbridge]]
-            [taoensso.timbre
-             :as timbre]
-            [clojure.test
-             :as t]))
+             [bytecode :as b]
+             [common :as c]
+             [isa :as i]]
+            [clojure.test :as t]
+            [taoensso.timbre :as timbre]
+            [toothpick.assembler :refer [assemble]]
+            [toothpick.isa.batbridge :refer [batbridge]]))
 
-(defrecord ps-test [opcodes predicate])
+(defrecord ps-test [state predicate])
 
 (defmacro deftest [sym opcodes predicate]
-  `(def ~sym (->ps-test ~opcodes ~predicate)))
+  `(let [state# (c/instrs->state ~opcodes)]
+     (def ~sym (->ps-test state# ~predicate))
+     (def ~(symbol (str (name sym) "-state")) state#)))
 
 (defn run-test
   "Destructures and runs a given test record using the specified step
@@ -29,8 +26,7 @@
 
   [test step bound]
   (timbre/with-log-level :warn
-    (let [{:keys [opcodes predicate]} test
-          state                       (c/instrs->state opcodes)]
+    (let [{:keys [state predicate]} test]
       ;; (println "[]" opcodes)
       ;; (println "[]" predicate)
       ;; (println "[]" bound)
@@ -45,35 +41,41 @@
 
 ;; Test suite based on computing fibonacci numbers
 ;;------------------------------------------------------------------------------
-(def fib-icodes
-  [;; load constants into registers
-   [:add  0  30 29 0 ] ;; preload fib(0)
-   [:add  1  30 29 1 ] ;; preload fib(1)
-   [:add  3  30 29 14] ;; the loop bound
+(defn r:= [r n]
+  [:add r 30 29 n])
 
-                       ;; write the fib loop
-   [:add  2  1  0  0 ] ;; add fib(n-2) + fib(n-1), store to fib
-   [:add  0  1  30 0 ] ;; move fib(n-1) down
-   [:add  1  2  30 0 ] ;; move fib(n) down
-   [:sub  3  3  29 1 ] ;; dec the loop constant
-   [:ifne    3  30 0 ] ;; test if we've zeroed the loop counter yet
-   [:add  31 30 29 12] ;; if not jump to the top of the loop
-   [:hlt             ] ;; otherwise halt
+(def fib-icodes
+  [
+   ;; init
+   (r:= 0 14)
+   (r:= 1 1)
+   (r:= 2 0)
+
+   ;; top
+   [:ifeq 0 30 0]
+   [:add 31 31 29 20] ; jump to the end
+   [:sub 0 0 29 1]
+   [:add 3 1 2 0] ; (+ fib₋₁ fib₋₂)
+   [:add 2 1 30 0] ; fib₋₂ := fib₋₁
+   [:add 1 3 30 0] ; fib₋₁ := r3 (subexpr)
+   [:sub 31 31 29 28]
+
+   ;; fall out
+   [:hlt]
    ])
 
 (deftest fib-test
-  ;; This test computes fib(15) and stores the result to r2.
+  ;; This test computes fib(14) and stores the result to r2.
   ;; r0 is used to store fib(n-2)
   ;; r1 is used to store fib(n-1)
   ;; r2 is a scratch register used to store fib(n)
-  ;; r3 is used to count down from 15 for loop control
+  ;; r3 is used to count down from 14 for loop control
 
   (c/seq->instrs fib-icodes)
 
   (fn [state]
-    (t/is (= (c/register->val state 2)  ;; fib 15 with th (0,1) as the base case
-             610))
-    (t/is (c/halted? state))           ;; the processor should have halted correctly
+    (t/is (= (c/register->val state 2) 610))
+    (t/is (c/halted? state))
     true))
 
 (deftest fib-byte-test
@@ -84,7 +86,7 @@
        (c/seq->instrs))
   
   (fn [state]
-    (t/is (= (c/register->val state 2)  ;; fib 15 with th (0,1) as the base case
+    (t/is (= (c/register->val state 1)  ;; fib 15 with th (0,1) as the base case
              610))
     (t/is (c/halted? state))           ;; the processor should have halted correctly
     true))
@@ -108,7 +110,7 @@
    [:add  0  30 29 1 ] ;; preload fact(0)
    [:add  1  30 29 10] ;; the loop bound
 
-                       ;; write the fact loop
+   ;; write the fact loop
    [:mul  0  0  1  0 ] ;; Multiply fact(n-1) and n
    [:sub  1  1  29 1 ] ;; dec the loop constant
    [:ifne    1  30 0 ] ;; test if we've zeroed the loop counter yet

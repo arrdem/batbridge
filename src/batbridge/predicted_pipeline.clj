@@ -119,9 +119,7 @@
 
   [processor]
   (let [directive                     (get processor :execute [:registers 30 0])
-        {:keys [dst addr val pc npc]} directive
-        processor                     (ss/writeback processor)]
-    (info "[writeback]" directive)
+        {:keys [dst addr val pc npc]} directive]
     (cond
       ;; special case for branching as we must flush the pipeline
       (and (= :registers dst)
@@ -135,11 +133,7 @@
             (warn "[writeback] Flushing pipeline!")
             (-> processor
                 (update-taken)
-                (train-jump (- pc 4) val)
-                (dissoc :fetch/result
-                        :decode/result
-                        :execute/result)
-                (assoc-in [:registers addr] val)))
+                (train-jump (- pc 4) val)))
 
       ;; special case for correctly predicted branching
       (and (= :registers dst)
@@ -166,7 +160,8 @@
 
   [state]
   (-> state
-      writeback
+      ((comp writeback
+             p/writeback))
       ss/execute
       p/decode
       fetch
