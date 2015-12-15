@@ -8,7 +8,8 @@
              ,,[bytecode
                 :refer [word->symbol-map]]
              ,,[common
-                :refer [register->val get-memory normalize-address]]]))
+                :refer [register->val get-memory normalize-address]]]
+            [taoensso.timbre :refer [info]]))
 
 ;; No-op constants for the various stages
 ;;------------------------------------------------------------------------------
@@ -62,16 +63,20 @@
              [:memory dst v]))
 
    :iflt (fn [p pc i x y dst]
+           (info "IFLT, pc" pc "testing" x y)
            [:registers 31 (if (< x y) pc (+ pc 4))])
 
    :ifle (fn [p pc i x y dst]
+           (info "IFLE, pc" pc "testing" x y)
            [:registers 31 (if (<= x y) pc (+ pc 4))])
 
    :ifeq (fn [p pc i x y dst]
+           (info "IFEQ, pc" pc "testing" x y)
            [:registers 31 (if (= x y) pc (+ pc 4))])
 
    :ifne (fn [p pc i x y dst]
-           [:registers 31 (if-not (= x y) pc (+ pc 4))])
+           (info "IFNE, pc" pc "testing" x y)
+           [:registers 31 (if (not= x y) pc (+ pc 4))])
 
    :add  (fn [p pc i x y dst]
            [:registers dst (+ x y)])
@@ -207,7 +212,7 @@
   [icode-maybe]
   (when-not (nil? icode-maybe)
     (cond-> icode-maybe
-      (vector?  icode-maybe) vec->symbol-map
       (integer? icode-maybe) word->symbol-map
+      (vector?  icode-maybe) vec->symbol-map
       true                   normalize-icode
       true                   normalize-registers)))

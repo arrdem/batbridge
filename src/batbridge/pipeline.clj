@@ -43,7 +43,8 @@
 
   [processor]
   (let [next-processor     (ss/decode processor)
-        decode             (:decode/result next-processor)
+        {:keys [pc]
+         :as   decode}     (:decode/result next-processor)
         execute            (:execute/result next-processor)
         {:keys [dst addr]} execute]
     (if (and (= :registers dst)
@@ -54,7 +55,8 @@
       (do (info "[decode   ] stalling the pipeline!")
           (-> processor
               (update :fetch/stall (fnil inc 0))
-              (dissoc :decode)))
+              (dissoc :decode/result)
+              (common/write-register 31 (- pc 4))))
       next-processor)))
 
 (defn writeback
@@ -67,7 +69,7 @@
   (let [directive                  (get processor
                                         :execute/result
                                         [:registers 30 0])
-        {:keys [dst addr val npc]} directive
+        {:keys [dst addr val pc]} directive
 
         ;; Use the perfectly functional single cycle implementation of
         ;; all this stuff
@@ -76,8 +78,9 @@
       ;; Case of writing a the next PC back to the PC, in which case
       ;; we don't have to stall or do anything fancy because life is
       ;; good.
-      [:registers 31 npc]
-      ,,processor
+      [:registers 31 pc]
+      ,,(do (info "[writeback] Next PC is" pc "not flushing pipeline")
+            processor)
 
       ;; Case of writing a different value to the PC, this being a
       ;; branch and forcing pipeline stall.
@@ -85,8 +88,7 @@
       ,,(do (warn "[writeback] Flushing pipeline!")
             (dissoc processor
                     :fetch/result
-                    :decode/result
-                    :execute/result))
+                    :decode/result))
 
       :else
       ,,processor)))

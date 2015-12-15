@@ -19,65 +19,75 @@
   (let [pc    (common/register->val processor 31)
         icode (common/get-memory processor pc)
         npc   (+ pc 4)]
-    (info "[fetch    ]" pc "->" icode)
     (cond
       (common/halted? processor)
-      ,,(assoc processor
-               :fetch/result
-               {:icode :hlt
-                :a 30 :b 30 :d 30 :i 0
-                :npc -1
-                :pc  -1})
+      ,,(do (warn "[fetch    ] halted!")
+            (assoc processor
+                   :fetch/result
+                   {:blob isa/vec-no-op
+                    :npc  -1
+                    :pc   -1}))
 
       (common/stalled? processor)
       ,,(do (info "[fetch    ] stalled!")
             (assoc processor
                    :fetch/result
-                   {:icode :add
-                    :a 30 :b 30 :d :30 :i 0
-                    :npc -1
-                    :pc  -1}))
+                   {:blob isa/vec-no-op
+                    :npc  -1
+                    :pc   -1}))
 
       :else
-      ,,(-> processor
-            (assoc-in [:registers 31] npc)
-            (assoc :fetch/result
-                   {:icode icode
-                    :npc   (+ npc 4)
-                    :pc    npc})))))
+      ,,(do (info "[fetch    ]" pc "->" icode)
+            (-> processor
+                (assoc-in [:registers 31] npc)
+                (assoc :fetch/result
+                       {:blob icode
+                        :npc   (+ npc 4)
+                        :pc    npc}))))))
 
 (defn- queue [coll]
   (into clojure.lang.PersistentQueue/EMPTY coll))
+
+(defn- queue? [obj]
+  (instance? clojure.lang.PersistentQueue obj))
 
 (defn- next-op
   "Function from a processor to the next operation which the processor
   needs to perform, the new macro queue and the number of new ops."
   [processor]
-  {:post [(or (number? (first %))
-              (vector? (first %)))
-          (instance? clojure.lang.PersistentQueue (second %))
-          (number? (last %))]}
+  {:post [(vector? %)
+          (let [[icode queue new] %]
+            (and (map? icode)
+                 (queue? queue)
+                 (number? new)
+                 (>= 0 new)))]}
   (let [;; constants
-        noop        {:icode isa/vec-no-op
-                     :pc    -1}
-        argfn       (juxt :d :a :b :i)
+        argfn         (juxt :d :a :b :i)
+        default-blob  {:blob isa/vec-no-op
+                       :npc  -1
+                       :pc   -1}
 
         ;; destructure arguments
-        ops         (:decode/ops processor (queue []))
+        ops           (:decode/ops processor (queue []))
+
+        {:keys [blob npc pc]
+         :as   fetch} (:fetch/result processor default-blob)
 
         ;; main logic
-
-        fetch       (:fetch/result processor isa/vec-no-op)
+        ;; --------------------
         ;; Decode that operation and figure out if it is a
         ;; macro (macro-fn will be nil if it isn't)
-        di          (isa/decode-instr fetch)
+        di            (isa/decode-instr blob)
+        _             (assert (map? di) (pr-str di))
+        _             (assert (keyword? (:icode di)) (pr-str di))
 
         ;; If the processor is stalled and we have ops in the queue,
         ;; then we take the first op from the queue. Otherwise we take
         ;; the op from fetch.
-        [icode ops] (if (and (common/stalled? processor) ops)
-                      [(peek ops) (pop ops)]
-                      [fetch      ops])]
+        [blob ops]   (if (and (common/stalled? processor)
+                              (not (empty? ops)))
+                       [(peek ops) (pop ops)]
+                       [fetch      ops])]
 
     (if-let [macro-fn (get isa/opcode->macro (:icode di))]
       ;; If we have a macro-fn, use it to compute the list of new
@@ -94,24 +104,28 @@
             ;; Choose the icode we're going to use. Either it'll be the
             ;; first of the new icodes because we're about to stall some,
             ;; or it'll be the icode we had to begin with
-            icode   (first new-ops)]
+            icode   (-> new-ops
+                        first
+                        isa/decode-instr)]
+
         [icode ops (count new-ops)])
 
       ;; Otherwise there are no new opcodes, don't do anything more.
-      [fetch ops 0])))
+      [di ops 0])))
 
 (defn decode
   [processor]
   (if-not (common/halted? processor)
-    (let [[icode queue n]  (next-op processor)
-          di               (isa/decode-instr icode)
-          {:keys [pc npc]} (:fetch/result processor)]
-      #_(info "[decode   ]" icode)
+    (let [[di queue n :as r] (next-op processor)
+          {:keys [pc npc]}   (:fetch/result processor)]
       (info "[decode   ]" (common/fmt-instr di))
       (-> processor
           (update :fetch/stall (fnil + 0) n)
-          (assoc :decode/ops queue
-                 :decode/result (merge di {:pc pc :npc npc}))))
+          (assoc :decode/ops
+                 ,,queue
+                 
+                 :decode/result
+                 ,,(merge di {:pc pc :npc npc}))))
     processor))
 
 (defn execute
@@ -124,16 +138,12 @@
   [processor]
   (let [{:keys [icode a b d i pc npc]
          :or   {pc    -1
-                npc   -1
-                icode :add
-                a     30
-                b     30
-                d     30
-                i     0}
+                npc   -1}
          :as   decode} (get processor :decode/result isa/map-no-op)
         srca           (common/register->val processor a pc i)
-        srcb           (common/register->val processor b pc i)]
-    (info "[execute  ]" ((juxt :icode :d :a :b :i) decode))
+        srcb           (common/register->val processor b pc i)
+        t              ((juxt :icode :d :a :b :i) decode)]
+    (info "[execute  ]" t)
     (as-> icode v
       (get isa/opcode->fn v)
       (v processor pc i srca srcb d)
@@ -155,8 +165,9 @@
 
   [processor]
   (let [directive              (get processor :execute/result isa/writeback-no-op)
-        {:keys [dst addr val]} directive]
-    (info "[writeback]" [dst addr val])
+        {:keys [dst addr val]} directive
+        t                      [dst addr val]]
+    (info "[writeback]" t)
     (match [dst addr val]
       [:halt _ _]
       ,,(assoc processor :halted true)
