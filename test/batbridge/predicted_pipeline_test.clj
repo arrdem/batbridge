@@ -3,9 +3,7 @@
             [batbridge.standard-cases :as sc]
             [clojure.test :refer :all]))
 
-
 (def bound 200)
-
 
 (deftest fib-test
   ;; runs the fib test on the single cycle machine

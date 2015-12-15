@@ -55,9 +55,13 @@
       (do (info "[decode   ] stalling the pipeline!")
           (-> processor
               (update :fetch/stall (fnil inc 0))
-              (dissoc :decode/result)
+              (dissoc :decode/result
+                      :fetch/result)
               (common/write-register 31 (- pc 4))))
       next-processor)))
+
+(def ^:dynamic post-correct-prediction-hook identity)
+(def ^:dynamic post-incorrect-prediction-hook identity)
 
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
@@ -80,18 +84,19 @@
       ;; good.
       [:registers 31 pc]
       ,,(do (info "[writeback] Next PC is" pc "not flushing pipeline")
-            processor)
+            (post-correct-prediction-hook processor))
 
       ;; Case of writing a different value to the PC, this being a
       ;; branch and forcing pipeline stall.
       [:registers 31 _]
       ,,(do (warn "[writeback] Flushing pipeline!")
-            (dissoc processor
-                    :fetch/result
-                    :decode/result))
+            (-> processor
+                (dissoc :fetch/result
+                        :decode/result)
+                post-incorrect-prediction-hook))
 
       :else
-      ,,processor)))
+      ,,(post-correct-prediction-hook processor))))
 
 (defn stall-dec
   "A dec which deals with a nil argument case, and has a floor value

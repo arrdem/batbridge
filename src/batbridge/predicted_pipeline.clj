@@ -6,7 +6,8 @@
   (:require [batbridge
              [single-cycle :as ss]
              [pipeline :as p]
-             [common :as common]]
+             [common :as common]
+             [bytecode :refer [word->opcode]]]
             [taoensso.timbre :refer [info warn]]
             [amalloy.ring-buffer :refer [ring-buffer]]))
 
@@ -96,6 +97,12 @@
 ;;------------------------------------------------------------------------------
 ;; Implement the bits of the processor that have to change
 
+(defn branch? [{:keys [icode] :as result}]
+  (or (when (number? icode)
+        (not= 0 (bit-and (word->opcode icode) 0x20)))
+      (when (vector? icode)
+        (#{:ifeq :iflt :ifle :ifne} (first icode)))))
+
 (defn fetch
   "Checks the stall counter, invoking ss/fetch if zero otherwise
   returning the input state unmodified due to a pipeline stall."
@@ -105,50 +112,31 @@
     processor
     (let [pc        (common/register->val processor 31)
           processor (ss/fetch processor)
-          npc       (next-pc processor)]
+          npc       (if (branch? (:fetch/result processor))
+                      (next-pc processor)
+                      (+ pc 4))]
       (info "[fetch    ]" pc "->" npc)
       (-> processor
           (assoc-in [:registers 31] npc)
           (assoc-in [:fetch :npc] npc)))))
 
-(defn writeback
-  "Pulls a writeback directive out of the processor state, and
-  performs the indicated update on the processor state. Update command
-  have been restructured and are now maps
-  {:dst (U :registers :halt :memory) :addr Int :val Int}."
+(defn fixup-prediction [processor]
+  (let [directive                     (get processor :execute/result [:registers 30 0])
+        {:keys [dst val pc]} directive]
+    (info "[retrain  ] changing a wrong prediction :(")
+    (-> processor
+        (update-taken)
+        (train-jump (- pc 4) val))))
 
-  [processor]
-  (let [directive                     (get processor :execute [:registers 30 0])
-        {:keys [dst addr val pc npc]} directive]
-    (cond
-      ;; special case for branching as we must flush the pipeline
-      (and (= :registers dst)
-           (= 31 addr)
-           ;; don't flush if we aren't changing
-           ;; the next PC value. This means to
-           ;; jumping to PC+4 does exactly
-           ;; nothing as it should.
-           (not (= val npc)))
-      ,,(do (warn "[writeback] Branch mispredict!")
-            (warn "[writeback] Flushing pipeline!")
-            (-> processor
-                (update-taken)
-                (train-jump (- pc 4) val)))
-
-      ;; special case for correctly predicted branching
-      (and (= :registers dst)
-           (= 31 addr)
-           ;; In this case we need to reinforce the
-           ;; branch prediction.
-           (= val npc)) 
-      ,,(do  (info "[writeback] Branch predicted!")
-             (-> processor
-                 (update-taken)
-                 (train-jump (- pc 4) val)))
-
-      true
-      ,,(-> processor
-            (update-not-taken)))))
+(defn correct-prediction [processor]
+  (let [directive                     (get processor :execute/result [:registers 30 0])
+        {:keys [dst npc pc]} directive]
+    (if (and pc npc)
+      (do (info "[train    ] training a correct prediction up!")
+          (-> processor
+              (update-taken)
+              (train-jump (- pc 4) npc)))
+      processor)))
 
 (defn step
   "Sequentially applies each phase of execution to a single processor
@@ -159,13 +147,16 @@
   storing the state between clock 'cycles'."
 
   [state]
-  (-> state
-      ((comp writeback
-             p/writeback))
-      ss/execute
-      p/decode
-      fetch
-      p/stall-dec))
+  (let [train (comp correct-prediction p/post-correct-prediction-hook)
+        fix   (comp fixup-prediction p/post-incorrect-prediction-hook)]
+    (binding [p/post-correct-prediction-hook   train
+              p/post-incorrect-prediction-hook fix]
+      (-> state
+          p/writeback
+          ss/execute
+          p/decode
+          fetch
+          p/stall-dec))))
 
 (defn -main
   "Steps a processor state until such time as it becomes marked as
