@@ -74,7 +74,7 @@
   (c/seq->instrs fib-icodes)
 
   (fn [state]
-    (t/is (= (c/register->val state 2) 610))
+    (t/is (= (c/register->val state 1) 610))
     (t/is (c/halted? state))
     true))
 
