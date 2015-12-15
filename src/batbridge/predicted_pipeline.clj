@@ -28,15 +28,12 @@
     (:inc) (min (inc (or v 2)) 3)
     (:dec) (max (dec (or v 2)) 0)))
 
-
 (defn bool->int [bool]
   (if bool 1 0))
-
 
 (defn vec->bitv [bool-vec]
   (reduce (fn [c b] (bit-or (bit-shift-left c 1) (bool->int b)))
           0 bool-vec))
-
 
 (defn train-pred [p addr hst res]
   (let [a [(bit-xor (bit-and 0x1FF addr)
@@ -44,7 +41,6 @@
     (case res
       (:taken)     (update-in p a two-bit-counter :inc)
       (:not-taken) (update-in p a two-bit-counter :dec))))
-
 
 (defn predict-pred [p addr hst]
   (>= (get p (bit-xor addr (vec->bitv hst)) 2) 2))
@@ -64,7 +60,6 @@
       (get jump-map pc)
       (+ 4 pc))))
 
-
 ;;--------------------------------------
 ;; Training API
 
@@ -75,14 +70,12 @@
         (update-in [:predictor :pred] train-pred this hst :taken)
         (update-in [:predictor :jump-map] assoc this next))))
 
-
 (defn train-step
   [processor]
   (let [{:keys [hst]} (:predictor processor)
         this          (common/register->val processor 31)]
     (-> processor
         (update-in [:predictor :pred] train-pred this hst :not-taken))))
-
 
 ;;--------------------------------------
 ;; History API
@@ -98,11 +91,9 @@
   [processor]
   (update-history processor true))
 
-
 (defn update-not-taken
   [processor]
   (update-history processor false))
-
 
 ;;------------------------------------------------------------------------------
 ;; Implement the bits of the processor that have to change
