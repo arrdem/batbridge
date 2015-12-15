@@ -86,9 +86,8 @@
        (c/seq->instrs))
   
   (fn [state]
-    (t/is (= (c/register->val state 1)  ;; fib 15 with th (0,1) as the base case
-             610))
-    (t/is (c/halted? state))           ;; the processor should have halted correctly
+    (t/is (= (c/register->val state 1) 610))
+    (t/is (c/halted? state))
     true))
 
 (t/deftest fib-encoding-equality-test
