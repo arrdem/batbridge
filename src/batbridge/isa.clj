@@ -8,8 +8,8 @@
              ,,[bytecode
                 :refer [word->symbol-map]]
              ,,[common
-                :refer [register->val get-memory]]]))
-
+                :refer [register->val get-memory normalize-address]]]
+            [taoensso.timbre :refer [info]]))
 
 ;; No-op constants for the various stages
 ;;------------------------------------------------------------------------------
@@ -45,9 +45,6 @@
 
   {:dst :registers :addr 30 :val 0 :pc -1})
 
-(defn- word-round-down
-  "Rounds x to the nearest multiple of 4 preserving sign in the direction of 0"
-  [x] (bit-and x (bit-not 3)))
 
 ;; The  common opcode implementation map
 ;;------------------------------------------------------------------------------
@@ -60,26 +57,30 @@
            [:halt nil nil])
 
    :ld   (fn [p pc i x y dst]
-           (let [a (word-round-down (+ x (* 4 y)))
+           (let [a (normalize-address (+ x (* 4 y)))
                  v (get-memory p a)]
              [:registers dst v]))
 
    :st   (fn [p pc i x y dst]
            (let [v   (register->val p dst pc i)
-                 dst (word-round-down (+ x (* 4 y)))]
+                 dst (normalize-address (+ x (* 4 y)))]
              [:memory dst v]))
 
    :iflt (fn [p pc i x y dst]
+           (info "IFLT, pc" pc "testing" x y)
            [:registers 31 (if (< x y) pc (+ pc 4))])
 
    :ifle (fn [p pc i x y dst]
+           (info "IFLE, pc" pc "testing" x y)
            [:registers 31 (if (<= x y) pc (+ pc 4))])
 
    :ifeq (fn [p pc i x y dst]
+           (info "IFEQ, pc" pc "testing" x y)
            [:registers 31 (if (= x y) pc (+ pc 4))])
 
    :ifne (fn [p pc i x y dst]
-           [:registers 31 (if-not (= x y) pc (+ pc 4))])
+           (info "IFNE, pc" pc "testing" x y)
+           [:registers 31 (if (not= x y) pc (+ pc 4))])
 
    :add  (fn [p pc i x y dst]
            [:registers dst (+ x y)])
@@ -114,6 +115,16 @@
    :sr   (fn [p pc i x y dst]
            [:registers dst (bit-shift-right x y)])})
 
+(def opcode->macro
+  {
+   :push (fn [dst a b i]
+           [[:sub a   a 29 4]
+            [:st  dst a 30 0]])
+
+   :pop (fn [dst a b i]
+          [[:ld  dst a 30 0]
+           [:add a   a 29 4]])
+   })
 
 (def bytecode->opcode
   "Maps bytecodes to their opcodes as per the spec."
@@ -124,6 +135,8 @@
    ;; memory ops
    0x10 :ld
    0x11 :st
+   0x12 :push
+   0x13 :pop
 
    ;; control ops
    0x20 :iflt
@@ -150,7 +163,6 @@
    ;; 0x3F undefined in v0
    })
 
-
 (def register-symbol-map
   "Provides translation from the shorthand keyword symbols used to
   identify registers to their integer index IDs."
@@ -169,20 +181,21 @@
   [vec-instr]
   (case (first vec-instr)
     (:ifeq :ifle :iflt :ifne)
-    ,,(zipmap [:icode :a :b :i] vec-instr)
+    ,,(-> (zipmap [:icode :a :b :i] vec-instr)
+          (assoc :d 0))
     
     (:hlt)
-    ,,(zipmap [:icode] vec-instr)
+    ,,(merge (zipmap [:icode] vec-instr)
+             {:a 0 :b 0 :d 0 :i 0})
 
     ;; else
     ,,(zipmap [:icode :d :a :b :i] vec-instr)))
 
-
 (defn normalize-icode
   "Does integer to symbol remapping for the icode of a decoded instr."
   [{:keys [icode] :as decode}]
-  (assoc decode :icode (get bytecode->opcode icode icode)))
-
+  {:pre [(map? decode)]}
+  (update decode :icode #(get bytecode->opcode % %)))
 
 (defn normalize-registers
   "Does symbol to integer normalization for the register parameters of
@@ -205,7 +218,7 @@
   [icode-maybe]
   (when-not (nil? icode-maybe)
     (cond-> icode-maybe
-            (vector?  icode-maybe) vec->symbol-map
-            (integer? icode-maybe) word->symbol-map
-            true                   normalize-icode
-            true                   normalize-registers)))
+      (integer? icode-maybe) word->symbol-map
+      (vector?  icode-maybe) vec->symbol-map
+      true                   normalize-icode
+      true                   normalize-registers)))

@@ -3,12 +3,13 @@
   effort to perform branch prediction, instruction caching or memory
   caching. Correctness with respect to the pipeline and bubbles is
   ensured however."
-  (:require [batbridge [isa :as isa]
-                       [common :as common]
-                       [single-cycle :as ss]]
+  (:require [batbridge
+             [isa :as isa]
+             [common :as common]
+             [single-cycle :as ss]]
             [taoensso.timbre :refer [info warn]]
-            [clojure.set :as set]))
-
+            [clojure.set :as set]
+            [clojure.core.match :refer [match]]))
 
 ;; There is an extra issue in the pipelined processor, one which I
 ;; completely forgot about until misbehavior in my test suite exposed
@@ -35,49 +36,27 @@
 ;; meaningful. The exception to this rule is a pipeline flush, which
 ;; zeros the stall counter and clears all stages.
 
-
-(defn stalled?
-  "Checks the stall counter, returning True if the stall counter is
-  nonzero. A nil value is treated as zero."
-
-  [processor]
-  (-> processor
-      (get :stall 0)
-      zero? not))
-
-
-(defn fetch
-  "Checks the stall counter, invoking ss/fetch if zero otherwise
-  returning the input state unmodified due to a pipeline stall."
-
-  [processor]
-  (if (stalled? processor)
-    processor
-    (ss/fetch processor)))
-
-
 (defn decode
   "Checks the stall counter, invoking ss/decode and checking for a
   pipeline hazzard in the result if zero otherwise returning the input
   state unmodified due to a pipeline stall."
 
   [processor]
-  (if (stalled? processor)
-    processor
-    (let [next-processor (ss/decode processor)
-          {:keys [decode execute]} next-processor
-          {:keys [dst addr]} execute]
-      (if (and (= :registers dst)
-               (contains? (-> #{}
-                              (into [(:a decode) (:b decode)])
-                              (disj 30 29))
-                          addr))
-        (do (info "[decode   ] stalling the pipeline!")
-            (-> processor
-                (assoc :stall 1)
-                (dissoc :decode)))
-        next-processor))))
-
+  (let [next-processor     (ss/decode processor)
+        {:keys [pc]
+         :as   decode}     (:decode/result next-processor ss/decode-default)
+        execute            (:execute/result next-processor ss/execute-default)
+        {:keys [dst addr]} execute]
+    (if (and (= :registers dst)
+             (contains? (-> #{}
+                            (into [(:a decode) (:b decode)])
+                            (disj 30 29))
+                        addr))
+      (do (info "[decode   ] stalling the pipeline! decoded instr \"pc\" was" pc)
+          (-> processor
+              (update :fetch/stall (fnil inc 0))
+              (assoc :decode/result ss/decode-default)))
+      next-processor)))
 
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
@@ -86,55 +65,32 @@
   {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
-  (let [directive (get processor :execute [:registers 30 0])
-        {:keys [dst addr val npc]} directive]
-    (info "[writeback]" directive)
-    (cond ;; special case to stop the show
-          (= :halt dst)
-            (assoc processor :halted true)
+  (let [directive                  (get processor
+                                        :execute/result
+                                        isa/writeback-no-op)
+        {:keys [dst addr val pc]} directive
 
-          ;; special case for hex code printing
-          (and (= :registers dst)
-               (= 29 addr))
-            (do (when-not (zero? val)
-                  (print (format "0x%X" (char val))))
-                processor)
+        ;; Use the perfectly functional single cycle implementation of
+        ;; all this stuff
+        processor                  (ss/writeback processor)]
+    (match [dst addr val]
+      ;; Case of writing a the next PC back to the PC, in which case
+      ;; we don't have to stall or do anything fancy because life is
+      ;; good.
+      [:registers 31 pc]
+      ,,(do (info "[writeback] Next PC is" pc "not flushing pipeline")
+            processor)
 
-          ;; special case for printing
-          (and (= :registers dst)
-               (= 30 addr))
-            (do (when-not (zero? val)
-                  (print (char val)))
-                processor)
+      ;; Case of writing a different value to the PC, this being a
+      ;; branch and forcing pipeline stall.
+      [:registers 31 _]
+      ,,(do (warn "[writeback] Flushing pipeline!")
+            (-> processor
+                (assoc :fetch/result  ss/fetch-default
+                       :decode/result ss/decode-default)))
 
-          ;; special case for branching as we must flush the pipeline
-          (and (= :registers dst)
-               (= 31 addr)
-               (not (= val npc))) ;; don't flush if we aren't changing
-                                  ;; the next PC value. This means to
-                                  ;; jumping to PC+4 does exactly
-                                  ;; nothing as it should.
-            (do (warn "[writeback] flushing pipeline!")
-                (-> processor
-                    (dissoc :fetch)
-                    (dissoc :decode)
-                    (dissoc :execute)
-                    (assoc-in [:registers addr] val)))
-
-          true
-            (assoc-in processor [dst addr] val))))
-
-
-(defn stall-dec
-  "A dec which deals with a nil argument case, and has a floor value
-  of 0."
-
-  [processor]
-  (update-in processor [:stall]
-             (fn [nillable-value]
-               (let [v (or nillable-value 0)]
-                 (max 0 (dec v))))))
-
+      :else
+      ,,processor)))
 
 (defn step
   "Sequentially applies each phase of execution to a single processor
@@ -149,9 +105,7 @@
       writeback
       ss/execute
       decode
-      fetch
-      stall-dec))
-
+      ss/fetch))
 
 (defn -main
   "Steps a processor state until such time as it becomes marked as

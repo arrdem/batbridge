@@ -3,12 +3,15 @@
   effort to perform branch prediction, instruction caching or memory
   caching. Correctness with respect to the pipeline and bubbles is
   ensured however."
-  (:require [batbridge [single-cycle :as ss]
-                       [pipeline :as p]
-                       [common :as common]]
-            [taoensso.timbre :refer [info warn]]
-            [amalloy.ring-buffer
-             :refer [ring-buffer]]))
+  (:require [amalloy.ring-buffer :refer [ring-buffer]]
+            [batbridge.isa :as isa]
+            [batbridge
+             [single-cycle :as ss]
+             [pipeline :as p]
+             [common :as common]
+             [bytecode :refer [word->opcode]]]
+            [clojure.core.match :refer [match]]
+            [taoensso.timbre :refer [debug info warn]]))
 
 ;; Build a simple branch predictor typeclass.
 ;; Several predictors are implemented as from McFarling[1]
@@ -54,9 +57,8 @@
   PC. Note that this relies on support from writeback to record PC
   value transitions when jumps are executed."
 
-  [processor]
-  (let [{:keys [jump-map pred hst]} (:predictor processor)
-        pc                          (common/register->val processor 31)]
+  [processor pc]
+  (let [{:keys [jump-map pred hst]} (:predictor processor)]
     (if (and (contains? jump-map pc)
              (predict-pred pred pc hst))
       (get jump-map pc)
@@ -89,9 +91,8 @@
   [processor outcome]
   (update-in processor [:predictor :hst]
              (fn [hist]
-               (into (ring-buffer 9)
-                     (conj hist outcome)))))
-
+               (let [hist (or hist (into (ring-buffer 9) (repeat 10 false)))]
+                 (conj hist outcome)))))
 
 (defn update-taken
   [processor]
@@ -106,23 +107,62 @@
 ;;------------------------------------------------------------------------------
 ;; Implement the bits of the processor that have to change
 
+(defn branch? [blob]
+  (or (when (number? blob)
+        (not= 0 (bit-and (word->opcode blob) 0x20)))
+      (when (vector? blob)
+        (#{:ifeq :iflt :ifle :ifne} (first blob)))))
+
 (defn fetch
   "Checks the stall counter, invoking ss/fetch if zero otherwise
   returning the input state unmodified due to a pipeline stall."
 
   [processor]
-  (if (p/stalled? processor)
-    processor
-    (let [pc    (common/register->val processor 31)
-          icode (common/get-memory processor pc)
-          npc   (next-pc processor)]
-      (info "[fetch    ]" pc "->" icode " npc:" npc)
-      (-> processor
-          (assoc-in [:registers 31] npc)
-          (assoc :fetch {:icode icode
-                         :npc   npc
-                         :pc    (+ pc 4)})))))
+  (if-not (common/halted? processor)
+    (let [pc   (common/register->val processor 31)
+          blob (common/get-memory processor pc)
+          npc  (if (branch? blob)
+                 (let [npc (next-pc processor pc)]
+                   (info "[fetch    ] Using a prediction!")
+                   (info "[fetch    ]" pc "->" npc)
+                   npc)
+                 (+ pc 4))]
+      (cond
+        (common/stalled? processor)
+        ,,(do (info "[fetch    ] Stalled!" (:fetch/stall processor))
+              (update processor :fetch/stall ss/zdec))
 
+        :else
+        ,,(do (info "[fetch    ]" pc "->" blob)
+              (-> processor
+                  (common/write-register 31 npc)
+                  (assoc :fetch/result
+                         {:blob blob
+                          :pc   (+ pc 4)
+                          :npc  npc})))))
+    processor))
+
+(defn fixup-prediction [processor]
+  (let [directive                     (get processor
+                                           :execute/result
+                                           isa/writeback-no-op)
+        {:keys [dst val pc]} directive]
+    (info "[retrain  ] Changing a wrong prediction :(")
+    (-> processor
+        (update-taken)
+        (train-jump (- pc 4) val))))
+
+(defn correct-prediction [processor]
+  (let [directive                     (get processor
+                                           :execute/result
+                                           isa/writeback-no-op)
+        {:keys [dst npc pc]} directive]
+    (if (and pc npc)
+      (do (debug "[train    ] Training a correct prediction up!")
+          (-> processor
+              (update-taken)
+              (train-jump (- pc 4) npc)))
+      processor)))
 
 (defn writeback
   "Pulls a writeback directive out of the processor state, and
@@ -131,59 +171,45 @@
   {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
-  (let [directive (get processor :execute [:registers 30 0])
-        {:keys [dst addr val pc npc]} directive]
-    (info "[writeback]" directive)
-    (cond ;; special case to stop the show
-          (= :halt dst)
-            (assoc processor :halted true)
+  (if-not (common/halted? processor)
+    (let [{:keys [dst addr val pc npc]
+           :or   {pc  -1
+                  npc -1}
+           :as   directive} (get processor
+                                 :execute/result
+                                 ss/execute-default)
 
-          ;; special case for hex code printing
-          (and (= :registers dst)
-               (= 29 addr))
-            (do (when-not (zero? val)
-                  (print (format "0x%X" (char val))))
-                processor)
+          ;; Use the perfectly functional single cycle implementation of
+          ;; all this stuff
+          fpc               (- pc 4)
+          d                 [dst addr val]]
+      (when-not (= [:registers 30 0] d)
+        (debug "[writeback]" d))
+      
+      (when (and (= dst :registers)
+                 (= addr 31))
+        (debug "[writeback]" (pr-str {:pc pc :npc npc :target val})))
 
-          ;; special case for printing
-          (and (= :registers dst)
-               (= 30 addr))
-            (do (when-not (zero? val)
-                  (print (char val)))
-                processor)
+      (match [dst addr val]
+        [:registers 31 npc]
+        ,,(do (info "[writeback] Not flushing for a correct prediction!")
+              (correct-prediction processor))
+        
+        ;; Case of writing a different value to the PC, this being a
+        ;; branch and forcing pipeline stall.
+        [:registers 31 _]
+        ,,(do (warn "[writeback] Flushing pipeline!")
+              (-> processor
+                  ss/writeback
+                  (assoc :decode/result ss/decode-default
+                         :fetch/result  ss/fetch-default)
+                  fixup-prediction))
 
-          ;; special case for branching as we must flush the pipeline
-          (and (= :registers dst)
-               (= 31 addr)
-               (not (= val npc))) ;; don't flush if we aren't changing
-                                  ;; the next PC value. This means to
-                                  ;; jumping to PC+4 does exactly
-                                  ;; nothing as it should.
-            (do (warn "[writeback] Branch mispredict!")
-                (warn "[writeback] flushing pipeline!")
-                (-> processor
-                    (update-taken)
-                    (train-jump (- pc 4) val)
-                    (dissoc :fetch)
-                    (dissoc :decode)
-                    (dissoc :execute)
-                    (assoc-in [:registers addr] val)))
-
-          ;; special case for correctly predicted branching
-          (and (= :registers dst)
-               (= 31 addr)
-               (= val npc)) ;; In this case we need to reinforce the
-                            ;; branch prediction.
-            (do  (info "[writeback] Branch predicted!")
-                 (-> processor
-                     (update-taken)
-                     (train-jump (- pc 4) val)))
-
-          true
-            (-> processor
-                (update-not-taken)
-                (assoc-in [dst addr] val)))))
-
+        :else
+        ,,(-> processor
+              ss/writeback
+              correct-prediction)))
+    processor))
 
 (defn step
   "Sequentially applies each phase of execution to a single processor
@@ -198,9 +224,7 @@
       writeback
       ss/execute
       p/decode
-      fetch
-      p/stall-dec))
-
+      fetch))
 
 (defn -main
   "Steps a processor state until such time as it becomes marked as

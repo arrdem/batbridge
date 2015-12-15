@@ -1,8 +1,8 @@
 (ns batbridge.common
   "Bits and pieces which were pulled out of various Batbridge
   simulators on the basis of constituting code repetition."
-  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get!
-                                     cache-write!]]))
+  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get! cache-write!]]
+            [taoensso.timbre :refer [warn]]))
 
 (defn register? 
   "Predicate to test whether or not the argument integer is a valid
@@ -13,12 +13,14 @@
        (< x 32)
        (>= x 0)))
 
+
 (defn halted? 
   "Common predicate for testing whether a processor state has become
   halted or not yet."
 
   [state]
   (or (:halted state) false))
+
 
 ;; Various processor components refactored out due to commonality
 ;;------------------------------------------------------------------------------
@@ -30,6 +32,7 @@
 
   [p addr]
   (cache-get! (:memory p) addr))
+
 
 (defn write-memory
   "Writes the argument value into the processor state's memory,
@@ -81,12 +84,21 @@
      (:r_IMM  29) imm
      (get-register processor reg))))
 
+(defn write-register
+  [p r v]
+  {:pre [(not (#{:r_IMM 29} r))]}
+  (let [target (normalize-register r)]
+    #_(when (= target 31)
+        (warn "[write-reg] setting PC to" v))
+    (assoc-in p [:registers target] v)))
+
 (defn upgrade-writeback-command
   "Transforms an old vector writeback command into the new map
   structure, thus allowing for pc data to be preserved."
   
   [[dst addr v]]
   {:dst dst :addr addr :val v})
+
 
 (defn fmt-instr
   "Formats a map instruction as a vector instruction. Intended for use
@@ -109,15 +121,23 @@
   traditional inline notation for a processor to a fully fledged cache
   hierarchy equiped structure." 
 
-  [{:keys [regs memory]}]
-  (let [initial-state 
-        {:registers regs
-         :memory (make-cache-hierarchy
-                  [[1 128] [2 512] [4 2048] [16 Long/MAX_VALUE]])}]
-    (doseq [[k v] memory]
-      (cache-write! (:memory initial-state) k v))
+  [{:keys [register-image
+           memory-image
+           cache-spec]
+    :as spec
+    :or {cache-spec [[1 128]
+                     [2 512]
+                     [4 2048]
+                     [16 Long/MAX_VALUE]]}}]
+  (let [memory        (make-cache-hierarchy cache-spec)
+        initial-state {:halted    false
+                       :registers register-image
+                       :memory    memory}]
+    (doseq [[addr v] memory-image]
+      (cache-write! memory addr v))
 
     initial-state))
+
 
 (defn seq->instrs
   "Translates a sequence of _vector_ instructions to a map of word IDs
@@ -130,6 +150,7 @@
   (zipmap (range 0 (* 4 (count seq)) 4) 
           seq))
 
+
 (defn instrs->state 
   "Generates the minimum of a processor state required to invoke
   a (step) implementation successfully. Agnostic as to the details of
@@ -139,5 +160,17 @@
   
   [instructions]
   (make-processor
-   {:memory instructions
-    :registers {31 0}}))
+   {:memory-image   instructions
+    :register-image {31 0}}))
+
+(defn stalled?
+  "Checks the stall counter, returning True if the stall counter is
+  nonzero. A nil value is treated as zero."
+
+  [processor]
+  (not (zero? (:fetch/stall processor 0))))
+
+(defn normalize-address
+  "Rounds down to the nearest multiple of 4"
+  [x]
+  (bit-and x (bit-not 3)))

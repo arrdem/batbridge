@@ -3,7 +3,6 @@
             [batbridge.assembler :as a]
             [clojure.test :refer :all]))
 
-
 (deftest assembler-test
   ;; these tests ensure that the decoders in bytecode produces the
   ;; same results as the encoder
