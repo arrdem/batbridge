@@ -107,12 +107,6 @@
 ;;------------------------------------------------------------------------------
 ;; Implement the bits of the processor that have to change
 
-(defn branch? [blob]
-  (or (when (number? blob)
-        (not= 0 (bit-and (word->opcode blob) 0x20)))
-      (when (vector? blob)
-        (#{:ifeq :iflt :ifle :ifne} (first blob)))))
-
 (defn fetch
   "Checks the stall counter, invoking ss/fetch if zero otherwise
   returning the input state unmodified due to a pipeline stall."
@@ -121,12 +115,10 @@
   (if-not (common/halted? processor)
     (let [pc   (common/register->val processor 31)
           blob (common/get-memory processor pc)
-          npc  (if (branch? blob)
-                 (let [npc (next-pc processor pc)]
-                   (info "[fetch    ] Using a prediction!")
-                   (info "[fetch    ]" pc "->" npc)
-                   npc)
-                 (+ pc 4))]
+          npc  (let [npc (next-pc processor pc)]
+                 (info "[fetch    ] Using a prediction!")
+                 (info "[fetch    ]" pc "->" npc)
+                 npc)]
       (cond
         (common/stalled? processor)
         ,,(do (info "[fetch    ] Stalled!" (:fetch/stall processor))
