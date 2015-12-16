@@ -59,7 +59,7 @@
             (and (map? icode)
                  (queue? queue)
                  (number? new)
-                 (>= 0 new)))]}
+                 (<= 0 new)))]}
   (let [;; constants
         argfn         (juxt :d :a :b :i)
 
