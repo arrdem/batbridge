@@ -3,12 +3,9 @@
   opcodes which will be common to the various simulators. These
   structures were refactored out of several different simulators in
   the interests of making spec compliance easiser to maintain."
-
   (:require [batbridge
-             ,,[bytecode
-                :refer [word->symbol-map]]
-             ,,[common
-                :refer [register->val get-memory normalize-address]]]
+             [bytecode :refer [word->symbol-map]]
+             [common :refer [get-memory normalize-address register->val]]]
             [taoensso.timbre :refer [info]]))
 
 ;; No-op constants for the various stages
