@@ -122,7 +122,6 @@
            :or   {pc  -1
                   npc -1}}   (:fetch/result processor fetch-default)]
       (info "[decode   ]" (common/fmt-instr di))
-      (println di (seq queue) n)
       (-> processor
           (update :fetch/stall (fnil + 0) n)
           (assoc :fetch/result
