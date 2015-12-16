@@ -6,7 +6,6 @@
   (:require [batbridge
              [common :as common]
              [isa :as isa]]
-            [batbridge.single-cycle :as ss]
             [clojure.core.match :refer [match]]
             [taoensso.timbre :refer [info warn debug]]))
 
@@ -83,13 +82,15 @@
         [blob ops]   (if (and (common/stalled? processor)
                               (not (empty? ops)))
                        [(peek ops) (pop ops)]
-                       [fetch      ops])]
+                       [di         ops])]
 
     (if-let [macro-fn (get isa/opcode->macro (:icode di))]
       ;; If we have a macro-fn, use it to compute the list of new
       ;; operations we need to perform.
       (let [new-ops (when macro-fn
-                      (apply macro-fn (argfn di)))
+                      (->> (argfn di)
+                           (apply macro-fn)
+                           (map isa/decode-instr)))
 
             ;; Note that these operations must occur before anything
             ;; already in the ops queue.
@@ -107,7 +108,7 @@
         [icode ops (count new-ops)])
 
       ;; Otherwise there are no new opcodes, don't do anything more.
-      [di ops 0])))
+      [blob ops 0])))
 
 (def decode-default
   (merge isa/map-no-op
@@ -119,11 +120,15 @@
     (let [[di queue n :as r] (next-op processor)
           {:keys [pc npc]
            :or   {pc  -1
-                  npc -1}}   (:fetch/result processor ss/fetch-default)]
+                  npc -1}}   (:fetch/result processor fetch-default)]
       (info "[decode   ]" (common/fmt-instr di))
+      (println di (seq queue) n)
       (-> processor
           (update :fetch/stall (fnil + 0) n)
-          (assoc :decode/ops
+          (assoc :fetch/result
+                 ,,fetch-default
+
+                 :decode/ops
                  ,,queue
 
                  :decode/result
