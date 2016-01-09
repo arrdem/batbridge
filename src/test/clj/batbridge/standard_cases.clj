@@ -212,3 +212,21 @@
     (t/is (= (c/get-memory state 1996) 1000))
     (t/is (= (c/register->val state 28) 1996))
     true))
+
+(def pop-icodes
+  [[:add  0  30  29 1000] ; preload r0 with a value
+   [:add  28 0   0  0]    ; preload the stack pointer with a value
+   [:st   0  28  30 0]    ; write value to pop
+   [:pop  1  28  0  0]    ; should pop value of 2k to r1
+   [:hlt             ]])
+
+(deftest pop-test
+  (->> pop-icodes
+       #_(assemble batbridge)
+       (c/seq->instrs))
+
+  (fn [state]
+    (t/is (c/halted? state))
+    (t/is (= (c/get-memory state 2000) 1000))
+    (t/is (= (c/register->val state 28) 2004))
+    true))
