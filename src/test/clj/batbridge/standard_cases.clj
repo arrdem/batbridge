@@ -195,3 +195,20 @@
       (t/is (= (c/get-memory state (+ 256 (* 4 i)))
                (fact i))))
     true))
+
+(def push-icodes
+  [[:add  0  30  29 1000] ; preload r0 with a value
+   [:add  28 0   0  0]    ; preload the stack pointer with a value
+   [:push 0  28  0  0]    ; push
+   [:hlt             ]])
+
+(deftest push-test
+  (->> push-icodes
+       #_(assemble batbridge)
+       (c/seq->instrs))
+
+  (fn [state]
+    (t/is (c/halted? state))
+    (t/is (= (c/get-memory state 1996) 1000))
+    (t/is (= (c/register->val state 28) 1996))
+    true))
