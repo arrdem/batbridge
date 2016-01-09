@@ -114,13 +114,15 @@
 
 (def opcode->macro
   {
-   :push (fn [dst a b i]
-           [[:sub a   a 28 4]
-            [:st  dst a 30 0]])
+   :push
+   ,,(fn [dst a b i]
+       [[:sub a   a 29 4]
+        [:st  dst a 30 0]])
 
-   :pop (fn [dst a b i]
-          [[:ld  dst a 30 0]
-           [:add a   a 28 4]])
+   :pop
+   ,,(fn [dst a b i]
+       [[:ld  dst a 30 0]
+        [:add a   a 29 4]])
    })
 
 (def bytecode->opcode
