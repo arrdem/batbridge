@@ -17,3 +17,6 @@
 
 (deftest memory-fact-test
   (sc/run-test sc/memory-fact-test ss/step bound))
+
+(deftest push-test
+  (sc/run-test sc/push-test ss/step bound))

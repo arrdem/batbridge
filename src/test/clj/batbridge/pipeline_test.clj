@@ -17,3 +17,6 @@
   (sc/run-test sc/fact-test p/step bound)
   (println "--------------------------------------------------------------------------------")
   (sc/run-test sc/fact-byte-test p/step bound))
+
+(deftest push-test
+  (sc/run-test sc/push-test p/step bound))
