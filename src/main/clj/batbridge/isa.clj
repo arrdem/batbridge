@@ -112,6 +112,12 @@
    :sr   (fn [p pc i x y dst]
            [:registers dst (bit-shift-right x y)])})
 
+;; A NOTE TO THE IMPLEMENTER:
+;;
+;; Writing to the PC flushes the opcodes list! This means that you
+;; cannot write a macrocoded instruction which performs a jump except
+;; in the tail position because that jump will terminate the macro!
+
 (def opcode->macro
   {
    :push

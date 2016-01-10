@@ -86,6 +86,7 @@
       [:registers 31 _]
       ,,(do (warn "[writeback] Flushing pipeline!")
             (-> processor
+                (dissoc :decode/ops)
                 (assoc :fetch/result  ss/fetch-default
                        :decode/result ss/decode-default)))
 
