@@ -121,8 +121,8 @@
 
    :pop
    ,,(fn [dst a b i]
-       [[:ld  dst a 30 0]
-        [:add a   a 29 4]])
+       [[:add a   a 29 4]
+        [:ld  dst a 29 -1]])
    })
 
 (def bytecode->opcode
