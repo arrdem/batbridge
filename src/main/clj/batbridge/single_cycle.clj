@@ -7,6 +7,7 @@
              [common :as common]
              [isa :as isa]]
             [clojure.core.match :refer [match]]
+            [clojure.core.queue :refer :all]
             [taoensso.timbre :refer [info warn debug]]))
 
 (def fetch-default
@@ -28,26 +29,18 @@
     (let [pc    (common/register->val processor 31)
           icode (common/get-memory processor pc)
           npc   (+ pc 4)]
-      (cond
-        (common/stalled? processor)
-        ,,(do (info "[fetch    ] Stalled!" (:fetch/stall processor))
-              (update processor :fetch/stall zdec))
-
-        :else
-        ,,(do (info "[fetch    ]" pc "->" icode)
-              (-> processor
-                  (common/write-register 31 npc)
-                  (assoc :fetch/result
-                         {:blob icode
-                          :pc    npc
-                          :npc   (+ npc 4)})))))
+      (if (common/stalled? processor)
+        (do (info "[fetch    ] Stalled!" (:fetch/stall processor))
+            (update processor :fetch/stall zdec))
+        
+        (do (info "[fetch    ]" pc "->" icode)
+            (-> processor
+                (common/write-register 31 npc)
+                (assoc :fetch/result
+                       {:blob icode
+                        :pc    npc
+                        :npc   (+ npc 4)})))))
     processor))
-
-(defn- queue [coll]
-  (into clojure.lang.PersistentQueue/EMPTY coll))
-
-(defn- queue? [obj]
-  (instance? clojure.lang.PersistentQueue obj))
 
 (defn- next-op
   "Function from a processor to the next operation which the processor

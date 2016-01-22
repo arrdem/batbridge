@@ -43,7 +43,11 @@
       (:not-taken) (update-in p a two-bit-counter :dec))))
 
 (defn predict-pred [p addr hst]
-  (>= (get p (bit-xor addr (vec->bitv hst)) 2) 2))
+  (as-> hst v
+    (vec->bitv v)
+    (bit-xor v addr)
+    (get p v 2)
+    (>= v 2)))
 
 ;; ------------------------------------------------------------------------------
 ;; [1] (http://www.hpl.hp.com/techreports/Compaq-DEC/WRL-TN-36.pdf)

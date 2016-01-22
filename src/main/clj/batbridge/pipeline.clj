@@ -9,6 +9,7 @@
              [single-cycle :as ss]]
             [taoensso.timbre :refer [info warn]]
             [clojure.set :as set]
+            [clojure.core.queue :refer :all]
             [clojure.core.match :refer [match]]))
 
 ;; There is an extra issue in the pipelined processor, one which I
@@ -65,14 +66,14 @@
   {:dst (U :registers :halt :memory) :addr Int :val Int}."
 
   [processor]
-  (let [directive                  (get processor
-                                        :execute/result
-                                        isa/writeback-no-op)
+  (let [directive                 (get processor
+                                       :execute/result
+                                       isa/writeback-no-op)
         {:keys [dst addr val pc]} directive
 
         ;; Use the perfectly functional single cycle implementation of
         ;; all this stuff
-        processor                  (ss/writeback processor)]
+        processor                 (ss/writeback processor)]
     (match [dst addr val]
       ;; Case of writing a the next PC back to the PC, in which case
       ;; we don't have to stall or do anything fancy because life is

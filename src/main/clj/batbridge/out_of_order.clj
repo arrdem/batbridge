@@ -1,14 +1,14 @@
 (ns batbridge.out-of-order
   "Implements an out of order pipeline on the basis of the
   scoreboarding algorithm."
-  (:require [batbridge [single-cycle :as ss]
-                       [pipeline :as p]
-                       [predicted-pipeline :as pp]
-                       [common :as common]]
+  (:require [batbridge
+             [single-cycle :as ss]
+             [pipeline :as p]
+             [predicted-pipeline :as pp]
+             [common :as common]]
             [taoensso.timbre :refer [info warn]]
             [amalloy.ring-buffer
              :refer [ring-buffer]]))
-
 
 ;; Garbage collected map
 ;;--------------------------------------------------------------------
@@ -51,9 +51,8 @@
   (let [k (-> "register"
               gensym name keyword)]
     [(-> m
-        (assoc k 0))
+         (assoc k 0))
      k]))
-
 
 ;; Renaming table
 ;;--------------------------------------------------------------------
@@ -108,7 +107,6 @@
     [(-> m
          (assoc :refcount gc)
          (assoc-in [:renaming k] k₀)) k₀]))
-
 
 ;; Instruction issuing
 ;;--------------------------------------------------------------------
