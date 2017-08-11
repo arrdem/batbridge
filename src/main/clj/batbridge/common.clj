@@ -1,7 +1,7 @@
 (ns batbridge.common
   "Bits and pieces which were pulled out of various Batbridge
   simulators on the basis of constituting code repetition."
-  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get! cache-write!]]
+  (:require [batbridge.cache :refer [make-cache-hierarchy cache-get!  cache-write!]]
             [taoensso.timbre :refer [warn]]))
 
 (defn register? 
@@ -99,12 +99,11 @@
   [[dst addr v]]
   {:dst dst :addr addr :val v})
 
-
 (defn fmt-instr
   "Formats a map instruction as a vector instruction. Intended for use
   in debugging / inspecting decoded word instructions."
 
-  [{:keys [icode d a b i] :as  map-instr}]
+  [{:keys [icode d a b i] :as map-instr}]
   (case icode
     (:ifeq :ifle :iflt :ifne)
     ,,[icode a b i]
@@ -124,11 +123,11 @@
   [{:keys [register-image
            memory-image
            cache-spec]
-    :as spec
-    :or {cache-spec [[1 128]
-                     [2 512]
-                     [4 2048]
-                     [16 Long/MAX_VALUE]]}}]
+    :as   spec
+    :or   {cache-spec [[1 128]
+                       [2 512]
+                       [4 2048]
+                       [16 Long/MAX_VALUE]]}}]
   (let [memory        (make-cache-hierarchy cache-spec)
         initial-state {:halted    false
                        :registers register-image
@@ -137,7 +136,6 @@
       (cache-write! memory addr v))
 
     initial-state))
-
 
 (defn seq->instrs
   "Translates a sequence of _vector_ instructions to a map of word IDs
@@ -149,7 +147,6 @@
   [seq] 
   (zipmap (range 0 (* 4 (count seq)) 4) 
           seq))
-
 
 (defn instrs->state 
   "Generates the minimum of a processor state required to invoke

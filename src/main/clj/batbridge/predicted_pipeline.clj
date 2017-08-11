@@ -58,7 +58,7 @@
   value transitions when jumps are executed."
 
   [processor pc]
-  (let [{:keys [jump-map pred hst]} (:predictor processor)]
+  (let [{{:keys [jump-map pred hst]} :predictor} processor]
     (if (and (contains? jump-map pc)
              (predict-pred pred pc hst))
       (get jump-map pc)
@@ -130,9 +130,9 @@
     processor))
 
 (defn fixup-prediction [processor]
-  (let [directive                     (get processor
-                                           :execute/result
-                                           isa/writeback-no-op)
+  (let [directive            (get processor
+                                  :execute/result
+                                  isa/writeback-no-op)
         {:keys [dst val pc]} directive]
     (info "[retrain  ] Changing a wrong prediction :(")
     (-> processor
@@ -140,9 +140,9 @@
         (train-jump (- pc 4) val))))
 
 (defn correct-prediction [processor]
-  (let [directive                     (get processor
-                                           :execute/result
-                                           isa/writeback-no-op)
+  (let [directive            (get processor
+                                  :execute/result
+                                  isa/writeback-no-op)
         {:keys [dst npc pc]} directive]
     (if (and pc npc)
       (do (debug "[train    ] Training a correct prediction up!")
@@ -165,11 +165,11 @@
            :as   directive} (get processor
                                  :execute/result
                                  ss/execute-default)
-
+          
           ;; Use the perfectly functional single cycle implementation of
           ;; all this stuff
-          fpc               (- pc 4)
-          d                 [dst addr val]]
+          fpc (- pc 4)
+          d   [dst addr val]]
       (when-not (= [:registers 30 0] d)
         (debug "[writeback]" d))
       
